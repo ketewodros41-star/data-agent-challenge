@@ -10,6 +10,7 @@ jobs:
   deploy:
     name: Deploy oracle-forge-sandbox
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,3 +20,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: workers/sandbox
+          command: versions upload src/index.js

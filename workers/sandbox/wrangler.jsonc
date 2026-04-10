@@ -1,0 +1,5 @@
+{
+  "name": "data-agent-challenge-sandbox",
+  "compatibility_date": "2026-04-10",
+  "main": "src/index.js"
+}

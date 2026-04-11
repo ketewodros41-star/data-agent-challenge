@@ -1,0 +1,70 @@
+sources:
+  postgres_main:
+    kind: postgres
+    host: 127.0.0.1
+    port: 55432
+    database: bookreview_db
+    user: postgres
+    password: teampalm
+
+  mongo_main:
+    kind: mongodb
+    uri: mongodb://127.0.0.1:57017
+
+tools:
+  list_tables:
+    kind: postgres-sql
+    source: postgres_main
+    description: List all tables in the bookreview database.
+    statement: |
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY table_schema, table_name;
+
+  describe_books_info:
+    kind: postgres-sql
+    source: postgres_main
+    description: Describe columns in the books_info table.
+    statement: |
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'books_info'
+      ORDER BY ordinal_position;
+
+  preview_books_info:
+    kind: postgres-sql
+    source: postgres_main
+    description: Preview rows from books_info.
+    statement: |
+      SELECT *
+      FROM books_info
+      LIMIT 10;
+
+  find_yelp_businesses:
+    kind: mongodb-find
+    source: mongo_main
+    database: yelp_db
+    collection: business
+    filterPayload: "{}"
+    limit: 5
+    description: Find documents in the Yelp business collection.
+
+  find_yelp_checkins:
+    kind: mongodb-find
+    source: mongo_main
+    database: yelp_db
+    collection: checkin
+    filterPayload: "{}"
+    limit: 5
+    description: Find documents in the Yelp checkin collection.
+
+toolsets:
+  oracle_forge:
+    tools:
+      - list_tables
+      - describe_books_info
+      - preview_books_info
+      - find_yelp_businesses
+      - find_yelp_checkins

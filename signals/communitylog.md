@@ -55,9 +55,7 @@
   keeping native types per db and letting the
   agent figure it out?"
 - **Views on their reply:** 7
-- **Our reply:** ⚠️ PENDING — must reply
-  before Tuesday submission
-- **Suggested reply to post:**
+- **Our reply:**
   > "Keeping native types per DB and putting
   resolution logic in the agent — specifically
   in Layer 2 of our context stack. We maintain

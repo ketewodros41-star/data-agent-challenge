@@ -337,13 +337,31 @@ technical approach:**
 - Notable responses:
 
 ### Articles
+
 #### Mistire — Article
-- Title:
-- Platform:
-- URL:
-- Word count:
-- X thread link:
-- Notable responses:
+
+- **Title:** The Join Key Problem: Why the Same Customer Is a Different Person in Every Database
+- **Platform:** Medium
+- **URL:** [Medium Article](https://medium.com/@mistiredan/the-join-key-problem-why-the-same-customer-is-a-different-person-in-every-database-10985194c39c)
+- **Authors:** Mistire — Signal Corps, PaLM Team
+- **Published:** April 2026
+- **Word count:** ~1,100
+- **Topics covered:**
+  - What the ill-formatted join key problem actually is —
+  same real-world entity represented differently across systems
+  - Why this is not a bug but the natural result of how
+  enterprise data infrastructure is built over time
+  - Why automatic detection is genuinely difficult:
+  unpredictable formats, no schema metadata, risk of
+  silent wrong answers
+  - The join key glossary approach — how Intelligence
+  Officers Estif and Melkam built a structured map of
+  entity ID formats across all DAB databases
+  - What this reveals about the broader problem:
+  query generation is the easy part; the hard part is
+  making institutional knowledge visible to the agent
+- **X thread link:** TBC
+- **Notable responses:** Pending
 
 ---
 
@@ -357,6 +375,6 @@ technical approach:**
 | Apr 10 | Reddit | Post + replies | https://www.reddit.com/r/learnmachinelearning/comments/1shx8ag/ | 867 views |
 | Apr 10 | Medium | Article | https://medium.com/@ktewodros41/were-building-a-data-agent-that-competes-on-a-uc-berkeley-benchmark-937d6370eee4 | TBC |
 | Apr 14 | X | Thread 3 — Benchmark | TBC | TBC |
-| Apr 16 | Medium/LinkedIn | Mistire Article | TBC | TBC |
+| Apr 16 | Medium | Mistire Article — The Join Key Problem | [The Join Key Problem](https://medium.com/@mistiredan/the-join-key-problem-why-the-same-customer-is-a-different-person-in-every-database-10985194c39c) | TBC |
 | Apr 17 | X | Thread 4 — Results | TBC | TBC |
 | Apr 18 | X | DAB PR Announcement | TBC | TBC |

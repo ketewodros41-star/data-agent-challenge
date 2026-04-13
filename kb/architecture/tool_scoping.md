@@ -24,10 +24,11 @@ The result is returned in a fixed structured format.
 This agent implements the same scoping pattern for databases.
 Each database type gets its own scoped tool.
 
-  query_postgresql → Standard SQL only → PostgreSQL connections
-  query_mongodb    → Aggregation pipeline only → MongoDB collections
-  query_sqlite     → Simple SQL only → SQLite files
-  query_duckdb     → Analytical SQL only → DuckDB warehouse
+  Tool              Query language        Database       Data type
+  query_postgresql  Standard SQL          PostgreSQL     Sales, transactions
+  query_mongodb     Aggregation pipeline  MongoDB        Support, CRM
+  query_sqlite      Simple SQL            SQLite         Reference, lookup
+  query_duckdb      Analytical SQL        DuckDB         Warehouse, analytics
 
 Never send SQL to query_mongodb. It will return empty silently.
 Never send a pipeline to query_postgresql. It will error.
@@ -38,9 +39,33 @@ The tool name determines the query language. Always.
 Step 1: Identify what type of data the question needs.
 Step 2: Check kb/domain/schemas.md for which DB holds it.
 Step 3: Select the matching tool. Generate query in its language.
-Step 4: For multi-DB questions: call each tool separately.
+Step 4: For multi-DB questions: call each tool separately — never combined.
+        Send both result sets to sandbox for merging.
         Never merge across tools in a single call.
-        Send both results to sandbox for merging.
+
+Cross-database join procedure:
+  1. Call query_postgresql → structured sales/transaction result
+  2. Call query_mongodb    → aggregation pipeline result
+  3. Normalize IDs in both sets: remove "CUST_", cast to int
+  4. Merge in sandbox (never in a single tool call)
+
+## Why silent failures make tool scoping critical
+
+When the wrong tool receives the wrong query language:
+  SQL → query_mongodb     → empty result, no error, agent unaware
+  Pipeline → query_postgresql → explicit error, agent retries
+
+Silent failures are worse. The agent produces a confident wrong
+answer with no signal that anything failed. Tool scoping prevents
+silent failures at the architectural level — not at retry time.
+
+## Unstructured fields — additional tool required
+
+Some fields require NLP extraction before querying:
+  support_notes, product_description, comments
+
+These must go through a text extraction step before joining
+structured results. Do not filter on raw text fields directly.
 
 ## Sub-agent spawn modes (from source: AgentTool, worktree)
 

@@ -4,17 +4,23 @@
 
 The repo now uses a single MCP Toolbox config at `mcp/tools.yaml`.
 
+Full MCP usage manual: [mcp/MANUAL.md](/home/bethel/data-agent-challenge/mcp/MANUAL.md)
+
 - Start the local Toolbox server with `./setup_dab.sh`
 - Use `./toolbox` to run the Toolbox CLI with the repo config preloaded
 - Launch the Toolbox UI with `./toolbox serve --enable-api --ui`
 - Configure the server URL with `TOOLBOX_URL` in `.env`
+- Set `DAB_DATASET_ROOT` in `.env` to the local `DataAgentBench` checkout that
+  should be mounted into the toolbox container as `/datasets`
+- Set `DUCKDB_MCP_URL` in `.env` for the custom DuckDB MCP service
 - For local Docker usage, `./toolbox` defaults to PostgreSQL `127.0.0.1:55432`
   and MongoDB `127.0.0.1:57017` unless overridden in `.env`
 - If port `5000` is already occupied by Docker or another toolbox process, run
   the UI on `5001` with
   `TOOLBOX_URL=http://127.0.0.1:5001 ./toolbox --ui --port 5001`
 - Use `MCPToolbox` from `agent/mcp_toolbox.py` for hybrid routing:
-  non-DuckDB tools go through the Toolbox CLI and DuckDB uses a direct driver path
+  Google Toolbox handles Postgres/Mongo/SQLite and the custom DuckDB MCP
+  service handles DuckDB-backed datasets
 
 Quick verification command:
 
@@ -54,8 +60,20 @@ Set these in `.env` when available:
 
 ```env
 TOOLBOX_URL=http://127.0.0.1:5000
+DAB_DATASET_ROOT=/home/<your-user>/DataAgentBench
 SANDBOX_URL=https://sandbox.<your-workers-subdomain>.workers.dev
 ```
+
+`./setup_dab.sh` now starts the toolbox in Docker, mounts the repo at
+`/workspace`, and mounts `${DAB_DATASET_ROOT}` at `/datasets` so the shared MCP
+config can use stable SQLite paths inside the container. It also starts a
+separate DuckDB MCP service on `${DUCKDB_MCP_URL:-http://127.0.0.1:8001}` for
+the benchmark DuckDB-backed datasets.
+
+Browser access after startup:
+
+- Google Toolbox UI: `http://127.0.0.1:5000`
+- DuckDB MCP UI: `http://127.0.0.1:8001`
 
 ### Verify MCP
 

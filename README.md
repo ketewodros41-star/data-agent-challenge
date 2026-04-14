@@ -5,6 +5,8 @@
 The repo now uses a single MCP Toolbox config at `mcp/tools.yaml`.
 
 - Start the local Toolbox server with `./setup_dab.sh`
+- Use `./toolbox` to run the Toolbox CLI with the repo config preloaded
+- Launch the Toolbox UI with `./toolbox serve --enable-api --ui`
 - Configure the server URL with `TOOLBOX_URL` in `.env`
 - Use `MCPToolbox` from `agent/mcp_toolbox.py` for hybrid routing:
   non-DuckDB tools go through the Toolbox CLI and DuckDB uses a direct driver path
@@ -12,7 +14,7 @@ The repo now uses a single MCP Toolbox config at `mcp/tools.yaml`.
 Quick verification command:
 
 ```bash
-./bin/toolbox invoke --config mcp/tools.yaml list_tables
+./toolbox invoke list_tables
 ```
 
 ## Runtime Manual
@@ -41,8 +43,8 @@ SANDBOX_URL=https://sandbox.<your-workers-subdomain>.workers.dev
 ### Verify MCP
 
 ```bash
-./bin/toolbox invoke --config mcp/tools.yaml preview_books_info
-./bin/toolbox invoke --config mcp/tools.yaml find_yelp_businesses
+./toolbox invoke preview_books_info
+./toolbox invoke find_yelp_businesses
 ```
 
 ### Verify Sandbox

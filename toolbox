@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLBOX_BIN="${ROOT_DIR}/bin/toolbox"
+TOOLS_CONFIG="${ROOT_DIR}/mcp/tools.yaml"
+
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  # shellcheck disable=SC1091
+  source "${ROOT_DIR}/.env"
+fi
+
+TOOLBOX_URL="${TOOLBOX_URL:-http://127.0.0.1:5000}"
+
+stripped_url="${TOOLBOX_URL#http://}"
+stripped_url="${stripped_url#https://}"
+host_port="${stripped_url%%/*}"
+address="${host_port%%:*}"
+port="${host_port##*:}"
+
+if [[ "${host_port}" == "${address}" ]]; then
+  if [[ "${TOOLBOX_URL}" == https://* ]]; then
+    port="443"
+  else
+    port="80"
+  fi
+fi
+
+if [[ ! -x "${TOOLBOX_BIN}" ]]; then
+  echo "Toolbox binary not found or not executable: ${TOOLBOX_BIN}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${TOOLS_CONFIG}" ]]; then
+  echo "Toolbox config not found: ${TOOLS_CONFIG}" >&2
+  exit 1
+fi
+
+forward_args=("$@")
+has_ui=false
+has_enable_api=false
+
+for arg in "${forward_args[@]}"; do
+  if [[ "${arg}" == "--ui" ]]; then
+    has_ui=true
+  fi
+  if [[ "${arg}" == "--enable-api" ]]; then
+    has_enable_api=true
+  fi
+done
+
+if [[ "${has_ui}" == true && "${has_enable_api}" == false ]]; then
+  forward_args=("--enable-api" "${forward_args[@]}")
+fi
+
+exec "${TOOLBOX_BIN}" \
+  --config "${TOOLS_CONFIG}" \
+  --address "${address}" \
+  --port "${port}" \
+  --toolbox-url "${TOOLBOX_URL}" \
+  "${forward_args[@]}"

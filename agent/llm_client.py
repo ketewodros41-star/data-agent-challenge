@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover
     anthropic = None
 
 OPENROUTER_URL_DEFAULT = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL_DEFAULT = "google/gemini-2.5-flash-preview-09-2025"
+OPENROUTER_MODEL_DEFAULT = "google/gemini-2.5-flash-lite"
 
 
 class LLMResponseContent:
@@ -99,7 +99,14 @@ class LLMClient:
         }
         url = self._openrouter_url.rstrip("/") + "/chat/completions"
         response = self._session.post(url, json=payload, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            body = response.text.strip()
+            details = body or str(exc)
+            raise RuntimeError(
+                f"OpenRouter request failed for model '{final_model}' at '{url}': {details}"
+            ) from exc
         data = response.json()
 
         choices = data.get("choices") or []

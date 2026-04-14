@@ -32,7 +32,7 @@ DataAgentBench is the first benchmark built on
 realistic enterprise data workloads. 54 queries. 
 12 datasets. 4 database systems: PostgreSQL, MongoDB, 
 SQLite, and DuckDB — often in the same query. The 
-best score on the leaderboard right now is 54.3%, 
+best score on the leaderboard right now is 38%, 
 achieved by PromptQL running Gemini. That ceiling 
 isn't a flaw in the benchmark. It's a signal about 
 how hard the real problem is.

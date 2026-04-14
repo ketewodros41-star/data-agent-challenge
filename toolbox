@@ -6,11 +6,24 @@ TOOLBOX_BIN="${ROOT_DIR}/bin/toolbox"
 TOOLS_CONFIG="${ROOT_DIR}/mcp/tools.yaml"
 RUNTIME_TOOLS_CONFIG="${TOOLS_CONFIG}"
 
-if [[ -f "${ROOT_DIR}/.env" ]]; then
-  # shellcheck disable=SC1091
-  source "${ROOT_DIR}/.env"
-fi
+read_env_value() {
+  local key="$1"
+  local env_file="${ROOT_DIR}/.env"
+  if [[ ! -f "${env_file}" ]]; then
+    return 1
+  fi
+  awk -F '=' -v target="${key}" '
+    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
+      value = substr($0, index($0, "=") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "${env_file}"
+}
 
+TOOLBOX_URL="${TOOLBOX_URL:-$(read_env_value TOOLBOX_URL || true)}"
 TOOLBOX_URL="${TOOLBOX_URL:-http://127.0.0.1:5000}"
 
 stripped_url="${TOOLBOX_URL#http://}"
@@ -37,12 +50,21 @@ if [[ ! -f "${TOOLS_CONFIG}" ]]; then
   exit 1
 fi
 
+PG_HOST="${PG_HOST:-$(read_env_value PG_HOST || true)}"
 PG_HOST="${PG_HOST:-127.0.0.1}"
+PG_PORT="${PG_PORT:-$(read_env_value PG_PORT || true)}"
 PG_PORT="${PG_PORT:-55432}"
+PG_DATABASE="${PG_DATABASE:-$(read_env_value PG_DATABASE || true)}"
 PG_DATABASE="${PG_DATABASE:-bookreview_db}"
+PG_USER="${PG_USER:-$(read_env_value PG_USER || true)}"
 PG_USER="${PG_USER:-postgres}"
+PG_PASSWORD="${PG_PASSWORD:-$(read_env_value PG_PASSWORD || true)}"
 PG_PASSWORD="${PG_PASSWORD:-teampalm}"
-MONGODB_URI="${MONGODB_URI:-${MONGO_URI:-mongodb://127.0.0.1:57017}}"
+MONGO_URI_FROM_ENV="${MONGO_URI:-$(read_env_value MONGO_URI || true)}"
+MONGODB_URI="${MONGODB_URI:-$(read_env_value MONGODB_URI || true)}"
+MONGODB_URI="${MONGODB_URI:-${MONGO_URI_FROM_ENV:-mongodb://127.0.0.1:57017}}"
+DAB_DATASET_ROOT="${DAB_DATASET_ROOT:-$(read_env_value DAB_DATASET_ROOT || true)}"
+DAB_DATASET_ROOT="${DAB_DATASET_ROOT:-${HOME}/DataAgentBench}"
 
 temp_config="$(mktemp /tmp/toolbox-config.XXXXXX.yaml)"
 trap 'rm -f "${temp_config}"' EXIT
@@ -60,6 +82,30 @@ sources:
   mongo_main:
     kind: mongodb
     uri: ${MONGODB_URI}
+
+  sqlite_bookreview:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_bookreview/query_dataset/review_query.db
+
+  sqlite_googlelocal:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_googlelocal/query_dataset/review_query.db
+
+  sqlite_agnews:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_agnews/query_dataset/metadata.db
+
+  sqlite_crm_core:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/core_crm.db
+
+  sqlite_crm_products:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/products_orders.db
+
+  sqlite_crm_territory:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/territory.db
 
 tools:
   postgres-database-overview:
@@ -186,6 +232,7 @@ tools:
     kind: postgres-execute-sql
     source: postgres_main
     description: Execute read-only SQL against PostgreSQL using a generic query parameter.
+    statement: "{{query}}"
 
   list_tables:
     kind: postgres-sql
@@ -235,6 +282,36 @@ tools:
     limit: 5
     description: Find documents in the Yelp checkin collection.
 
+  sqlite_bookreview_query:
+    kind: sqlite-execute-sql
+    source: sqlite_bookreview
+    description: Execute SQL against the BookReview SQLite review database.
+
+  sqlite_googlelocal_query:
+    kind: sqlite-execute-sql
+    source: sqlite_googlelocal
+    description: Execute SQL against the GoogleLocal SQLite review database.
+
+  sqlite_agnews_query:
+    kind: sqlite-execute-sql
+    source: sqlite_agnews
+    description: Execute SQL against the AG News SQLite metadata database.
+
+  sqlite_crm_core_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_core
+    description: Execute SQL against the CRM Arena Pro core SQLite database.
+
+  sqlite_crm_products_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_products
+    description: Execute SQL against the CRM Arena Pro products/orders SQLite database.
+
+  sqlite_crm_territory_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_territory
+    description: Execute SQL against the CRM Arena Pro territory SQLite database.
+
 toolsets:
   oracle_forge:
     tools:
@@ -268,6 +345,12 @@ toolsets:
       - preview_books_info
       - find_yelp_businesses
       - find_yelp_checkins
+      - sqlite_bookreview_query
+      - sqlite_googlelocal_query
+      - sqlite_agnews_query
+      - sqlite_crm_core_query
+      - sqlite_crm_products_query
+      - sqlite_crm_territory_query
 EOF
 
 RUNTIME_TOOLS_CONFIG="${temp_config}"

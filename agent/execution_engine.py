@@ -13,6 +13,7 @@ Routing:
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -432,7 +433,7 @@ class ExecutionEngine:
                     cleaned = "\n".join(inner_lines).strip()
         if cleaned.lower().startswith("sql\n"):
             cleaned = cleaned[4:].lstrip()
-        cleaned = cleaned.replace("\\'", "''")
+        cleaned = re.sub(r"\\+'", "''", cleaned)
         return cleaned
 
     def _match_static_pg_tool(self, query: str) -> Optional[str]:

@@ -230,7 +230,6 @@ before architecture is finalised.**
 | Apr 9 | X | Reply to @rivestack | https://x.com/Kidus5T99409/status/2042897418534924327?s=20 | 7 |
 | Apr 10 | Reddit | Post + replies | https://www.reddit.com/r/learnmachinelearning/comments/1shx8ag/ | 867 |
 | Apr 10 | Medium | Article | https://medium.com/@ktewodros41/were-building-a-data-agent-that-competes-on-a-uc-berkeley-benchmark-937d6370eee4 | TBC |
-| Apr 14 | X | Thread 3 — Benchmark | TBC | TBC |
 | Apr 16 | Medium/LinkedIn | Mistire Article | TBC | TBC |
 | Apr 17 | X | Thread 4 — Results | TBC | TBC |
 | Apr 18 | X | DAB PR Announcement | TBC | TBC |

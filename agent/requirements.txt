@@ -1,0 +1,12 @@
+# Runtime dependencies for the Oracle Forge agent.
+# These versions are taken from the current uv.lock resolution.
+
+anthropic==0.95.0
+duckdb==1.5.2
+levenshtein==0.27.3
+openai==2.31.0
+psycopg2-binary==2.9.11
+pydantic==2.13.0
+pymongo==4.16.0
+python-dotenv==1.2.2
+requests==2.33.1

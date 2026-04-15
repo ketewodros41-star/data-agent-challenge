@@ -6,9 +6,10 @@
 # Deploy manually:  cd workers/sandbox && wrangler deploy
 # Local dev:        cd workers/sandbox && wrangler dev
 
-name = "data-agent-challenge-sandbox"
+name = "sandbox"
 main = "src/index.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 account_id = "d0a50020c18281c7fc510280facca780"
 
 # ── Static environment variables (non-secret) ──────────────────────────────

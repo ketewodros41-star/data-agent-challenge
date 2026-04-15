@@ -1,0 +1,4 @@
+databases:
+  books_database:
+    type: "postgres"
+    connection_string: ""

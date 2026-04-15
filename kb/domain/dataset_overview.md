@@ -14,7 +14,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 
 | Database | Type | Key collections/tables |
 |---|---|---|
-| businessinfo_database | MongoDB | business, checkin |
+| yelp_db | MongoDB | business, checkin |
 | user_database | DuckDB | review, tip, user |
 
 **Join key:** `business_id` (MongoDB) ↔ `business_ref` (DuckDB). These are NOT the same string. MongoDB uses prefix `businessid_N`; DuckDB uses `businessref_N`. Strip prefix and match integer suffix.
@@ -34,7 +34,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 | Database | Type | Key tables |
 |---|---|---|
 | review_database | SQLite | review |
-| business_database | PostgreSQL | business_description |
+| googlelocal_db | PostgreSQL | business_description |
 
 **Join key:** `gmap_id` — exact match across both databases. No format mismatch.
 
@@ -153,7 +153,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 
 | Database | Type | Key tables |
 |---|---|---|
-| articles_database | MongoDB | articles |
+| articles_db | MongoDB | articles |
 | metadata_database | SQLite | authors, article_metadata |
 
 **Join key:** `article_id` (integer) — exact match.
@@ -171,7 +171,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 
 | Database | Type | Key tables |
 |---|---|---|
-| books_database | PostgreSQL | books_info |
+| bookreview_db | PostgreSQL | books_info |
 | review_database | SQLite | review |
 
 **Join key:** `book_id` (books_info, PostgreSQL) ↔ `purchase_id` (review, SQLite). Field names differ AND values may require fuzzy matching. Use fuzzy join, not exact equality.
@@ -189,7 +189,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 | Database | Type | Key tables |
 |---|---|---|
 | publication_database | SQLite | publicationinfo |
-| CPCDefinition_database | (PostgreSQL or SQLite — check db_config) | cpc_definition |
+| patent_CPCDefinition | (PostgreSQL or SQLite — check db_config) | cpc_definition |
 
 **Join key:** `cpc` field in `publicationinfo` (CPC classification codes) ↔ `symbol` in `cpc_definition`. Match code prefix (CPC codes are hierarchical, e.g. "A61K 31/00").
 
@@ -241,7 +241,7 @@ Each dataset entry describes: databases, types, join mechanism, and primary chal
 
 | Database | Type | Key tables |
 |---|---|---|
-| clinical_database | PostgreSQL | clinical_info |
+| pancancer_clinical | PostgreSQL | clinical_info |
 | molecular_database | SQLite | Mutation_Data, (RNA expression table — check db_config) |
 
 **Join key:** `Patient_description` in clinical_info (NL field containing patient barcode/UUID) ↔ `ParticipantBarcode` in molecular tables. Extract barcode from `Patient_description` text before joining.

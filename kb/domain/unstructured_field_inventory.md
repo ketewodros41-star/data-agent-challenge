@@ -9,12 +9,12 @@ The agent must extract before computing. Listed by dataset.
 
 | Field | Table/Collection | DB | Content type | Extraction approach |
 |---|---|---|---|---|
-| `description` | business (MongoDB) | businessinfo_database | NL text with embedded location (city, state, address) | Regex or LLM extraction for state/city |
-| `attributes` | business (MongoDB) | businessinfo_database | Python dict serialised as string (or null) | `ast.literal_eval()` then key lookup |
-| `hours` | business (MongoDB) | businessinfo_database | Python dict of day→hours string | `ast.literal_eval()` |
+| `description` | business (MongoDB) | yelp_db | NL text with embedded location (city, state, address) | Regex or LLM extraction for state/city |
+| `attributes` | business (MongoDB) | yelp_db | Python dict serialised as string (or null) | `ast.literal_eval()` then key lookup |
+| `hours` | business (MongoDB) | yelp_db | Python dict of day→hours string | `ast.literal_eval()` |
 | `elite` | user (DuckDB) | user_database | Comma-separated year strings, e.g. "2015,2016" | Split on comma, cast to int |
 | `text` | review/tip (DuckDB) | user_database | Free text — sentiment/topic extraction needed for some queries | LLM or keyword search |
-| `date` (checkin) | checkin (MongoDB) | businessinfo_database | List of ISO timestamp strings | Parse each element |
+| `date` (checkin) | checkin (MongoDB) | yelp_db | List of ISO timestamp strings | Parse each element |
 
 ---
 
@@ -22,9 +22,9 @@ The agent must extract before computing. Listed by dataset.
 
 | Field | Table | DB | Content type | Extraction approach |
 |---|---|---|---|---|
-| `description` | business_description (PostgreSQL) | business_database | NL text with business category, address, US state | Regex for state abbreviation; LLM for category |
-| `MISC` | business_description (PostgreSQL) | business_database | JSON-like dict of amenities/attributes | `json.loads()` or `ast.literal_eval()` |
-| `hours` | business_description (PostgreSQL) | business_database | List of operating hour strings | Parse each element |
+| `description` | business_description (PostgreSQL) | googlelocal_db | NL text with business category, address, US state | Regex for state abbreviation; LLM for category |
+| `MISC` | business_description (PostgreSQL) | googlelocal_db | JSON-like dict of amenities/attributes | `json.loads()` or `ast.literal_eval()` |
+| `hours` | business_description (PostgreSQL) | googlelocal_db | List of operating hour strings | Parse each element |
 | `text` | review (SQLite) | review_database | Free text review — sentiment queries possible | LLM or keyword extraction |
 
 **Important:** `state` column in `business_description` is *operating status* (OPEN/CLOSED), NOT a US state. US state must come from `description` text.
@@ -35,7 +35,7 @@ The agent must extract before computing. Listed by dataset.
 
 | Field | Collection/Table | DB | Content type | Extraction approach |
 |---|---|---|---|---|
-| `title` + `description` | articles (MongoDB) | articles_database | Free text — **category must be inferred from these** | LLM classification into: World / Sports / Business / Science/Technology |
+| `title` + `description` | articles (MongoDB) | articles_db | Free text — **category must be inferred from these** | LLM classification into: World / Sports / Business / Science/Technology |
 
 **Category inference prompt:** "Given this news article title and description, classify it into exactly one of: World, Sports, Business, Science/Technology."
 
@@ -45,10 +45,10 @@ The agent must extract before computing. Listed by dataset.
 
 | Field | Table | DB | Content type | Extraction approach |
 |---|---|---|---|---|
-| `description` | books_info (PostgreSQL) | books_database | String repr of Python list, e.g. `"['Great book', 'A must read']"` | `ast.literal_eval()` then join list |
-| `categories` | books_info (PostgreSQL) | books_database | String repr of Python list, e.g. `"['Books', 'Mystery']"` | `ast.literal_eval()` |
-| `features` | books_info (PostgreSQL) | books_database | String repr of dict or list | `ast.literal_eval()` |
-| `details` | books_info (PostgreSQL) | books_database | String repr of dict with publisher, ISBN, etc. | `ast.literal_eval()` then key lookup |
+| `description` | books_info (PostgreSQL) | bookreview_db | String repr of Python list, e.g. `"['Great book', 'A must read']"` | `ast.literal_eval()` then join list |
+| `categories` | books_info (PostgreSQL) | bookreview_db | String repr of Python list, e.g. `"['Books', 'Mystery']"` | `ast.literal_eval()` |
+| `features` | books_info (PostgreSQL) | bookreview_db | String repr of dict or list | `ast.literal_eval()` |
+| `details` | books_info (PostgreSQL) | bookreview_db | String repr of dict with publisher, ISBN, etc. | `ast.literal_eval()` then key lookup |
 
 ---
 
@@ -97,7 +97,7 @@ The agent must extract before computing. Listed by dataset.
 
 | Field | Table | DB | Content type | Extraction approach |
 |---|---|---|---|---|
-| `Patient_description` | clinical_info (PostgreSQL) | clinical_database | NL text embedding barcode, UUID, gender, vital status | Regex: `r'TCGA-[A-Z0-9]{2}-[A-Z0-9]{4}'` for barcode |
+| `Patient_description` | clinical_info (PostgreSQL) | pancancer_clinical | NL text embedding barcode, UUID, gender, vital status | Regex: `r'TCGA-[A-Z0-9]{2}-[A-Z0-9]{4}'` for barcode |
 
 ---
 

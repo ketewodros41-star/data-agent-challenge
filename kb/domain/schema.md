@@ -8,7 +8,7 @@ Each dataset section includes: databases, DB engine, tables/collections, all fie
 
 ## 1. yelp
 
-### businessinfo_database — MongoDB
+### yelp_db — MongoDB
 
 #### Collection: `business`
 | Field | Type | Notes |
@@ -80,11 +80,11 @@ Each dataset section includes: databases, DB engine, tables/collections, all fie
 | time | str | Timestamp string |
 | rating | int | 1–5 |
 | text | str | Review text |
-| gmap_id | str | Join key — exact match to business_database |
+| gmap_id | str | Join key — exact match to googlelocal_db |
 
 ---
 
-### business_database — PostgreSQL
+### googlelocal_db — PostgreSQL
 
 #### Table: `business_description`
 | Field | Type | Notes |
@@ -323,7 +323,7 @@ Query `SHOW TABLES` to enumerate.
 
 ---
 
-### support — PostgreSQL
+### crm_support — PostgreSQL
 
 #### Table: `Case`
 | Field | Type | Notes |
@@ -443,7 +443,7 @@ Query `SHOW TABLES` to enumerate.
 
 ## 7. agnews
 
-### articles_database — MongoDB
+### articles_db — MongoDB
 
 #### Collection: `articles`
 | Field | Type | Notes |
@@ -470,7 +470,7 @@ Query `SHOW TABLES` to enumerate.
 
 ## 8. bookreview
 
-### books_database — PostgreSQL
+### bookreview_db — PostgreSQL
 
 #### Table: `books_info`
 | Field | Type | Notes |
@@ -522,12 +522,12 @@ Query `SHOW TABLES` to enumerate.
 | priority_claim | str | List of priority applications |
 | inventor_harmonized | str | Harmonised inventor list |
 | examiner | str | Patent examiner(s) |
-| cpc | str | CPC classification code(s) — join to CPCDefinition_database |
+| cpc | str | CPC classification code(s) — join to patent_CPCDefinition |
 | citation | str | Citation list |
 
 ---
 
-### CPCDefinition_database — (PostgreSQL)
+### patent_CPCDefinition — (PostgreSQL)
 
 #### Table: `cpc_definition`
 | Field | Type | Notes |
@@ -654,7 +654,7 @@ Query `SHOW TABLES` to enumerate.
 
 ## 12. PANCANCER_ATLAS
 
-### clinical_database — PostgreSQL
+### pancancer_clinical — PostgreSQL
 
 #### Table: `clinical_info`
 Over 100 columns. Key columns confirmed:

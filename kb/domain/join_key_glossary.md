@@ -11,7 +11,7 @@ Before any join, look up the dataset here and apply the resolution logic listed.
 
 ## yelp — businessid_ / businessref_ prefix mismatch
 
-**Databases:** businessinfo_database (MongoDB) ↔ user_database (DuckDB)
+**Databases:** yelp_db (MongoDB) ↔ user_database (DuckDB)
 **Fields:** `business.business_id` ↔ `review.business_ref` and `tip.business_ref`
 **Format in MongoDB:** `businessid_1`, `businessid_42`, `businessid_1008`
 **Format in DuckDB:** `businessref_1`, `businessref_42`, `businessref_1008`
@@ -30,7 +30,7 @@ normalize = lambda s: s.split("_", 1)[1]   # "42"
 
 ## bookreview — book_id / purchase_id name and value mismatch
 
-**Databases:** books_database (PostgreSQL) ↔ review_database (SQLite)
+**Databases:** bookreview_db (PostgreSQL) ↔ review_database (SQLite)
 **Fields:** `books_info.book_id` ↔ `review.purchase_id`
 **Problem:** Field names differ AND values may not be identical strings — fuzzy join required.
 **Resolution:** Use fuzzy string matching (e.g. Levenshtein distance ≤ 2) or normalise both to lowercase and strip whitespace/punctuation before joining.
@@ -85,7 +85,7 @@ tables = conn.execute("SHOW TABLES").fetchall()
 
 ## PATENTS — CPC code hierarchical matching
 
-**Databases:** publication_database (SQLite) ↔ CPCDefinition_database
+**Databases:** publication_database (SQLite) ↔ patent_CPCDefinition
 **Fields:** `publicationinfo.cpc` ↔ `cpc_definition.symbol`
 **Problem:** `cpc` field may contain multiple codes as a list/string; codes are hierarchical (A61K 31/00 is a subclass of A61K).
 **Resolution:** Extract individual codes from the `cpc` field (split on delimiter), then join to `cpc_definition` on `symbol`. For hierarchy queries, use prefix matching: `symbol LIKE 'A61K%'`.
@@ -94,7 +94,7 @@ tables = conn.execute("SHOW TABLES").fetchall()
 
 ## PANCANCER_ATLAS — ParticipantBarcode embedded in NL text
 
-**Databases:** clinical_database (PostgreSQL) ↔ molecular_database (SQLite)
+**Databases:** pancancer_clinical (PostgreSQL) ↔ molecular_database (SQLite)
 **Fields:** `clinical_info.Patient_description` ↔ `Mutation_Data.ParticipantBarcode`
 **Problem:** `Patient_description` is natural language text; barcode is embedded within it.
 **Resolution:** Extract using regex pattern `TCGA-[A-Z0-9]{2}-[A-Z0-9]{4}`.

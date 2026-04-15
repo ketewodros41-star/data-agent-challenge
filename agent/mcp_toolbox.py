@@ -151,24 +151,84 @@ class MCPToolbox:
         """Send tool invocation to MCP Toolbox HTTP server."""
         url = f"{self.toolbox_url}/api/tool/{tool_name}/invoke"
         payload = json.dumps(parameters).encode("utf-8")
+
         req = urllib.request.Request(
             url,
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
+
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode())
+                raw = json.loads(resp.read().decode())
+
+                result = raw.get("result", raw)
+
+                # NORMALIZATION LAYER
+                normalized = self._normalize_mcp_content(result)
+
                 return ToolResult(
                     success=True,
-                    data=data.get("result", data),
+                    data=normalized,
                 )
+
         except urllib.error.HTTPError as exc:
             body = exc.read().decode() if exc.fp else str(exc)
             return ToolResult(success=False, data=None, error=f"HTTP {exc.code}: {body}")
         except Exception as exc:
             return ToolResult(success=False, data=None, error=str(exc))
+
+
+    def _normalize_mcp_content(self, result: Any) -> List[Any]:
+        """
+        Convert MCP 'text' responses containing stringified JSON into structured Python objects.
+
+        Guards against non-dict results (e.g. plain error strings returned by the toolbox
+        in the result field) so the real error message is preserved rather than producing
+        a misleading "'str' object has no attribute 'get'" AttributeError.
+        """
+        if not isinstance(result, dict):
+            # Toolbox returned a list, plain string (error) or unexpected type.
+            # Lists are returned as-is; others are wrapped for caller convenience.
+            if isinstance(result, list):
+                return result
+            return [result] if result is not None else []
+
+        content = result.get("content", [])
+
+        normalized_rows = []
+
+        for item in content:
+            if not isinstance(item, dict):
+                normalized_rows.append(item)
+                continue
+
+            if item.get("type") == "text":
+                text = item.get("text", "")
+
+                try:
+                    parsed = json.loads(text)
+                    # The toolbox sometimes double-encodes: json.loads gives a string
+                    # that is itself a JSON-encoded list/dict.  Decode a second time.
+                    if isinstance(parsed, str):
+                        try:
+                            parsed = json.loads(parsed)
+                        except json.JSONDecodeError:
+                            pass
+                    if isinstance(parsed, list):
+                        normalized_rows.extend(parsed)
+                    else:
+                        normalized_rows.append(parsed)
+                except json.JSONDecodeError:
+                    # fallback: keep raw text
+                    normalized_rows.append(text)
+
+            else:
+                # already structured (e.g., future JSON types)
+                normalized_rows.append(item)
+
+        return normalized_rows
 
     def _post_mcp(self, method: str, params: Dict[str, Any], base_url: Optional[str] = None) -> Dict[str, Any]:
         """Send a JSON-RPC request to the toolbox MCP HTTP endpoint."""

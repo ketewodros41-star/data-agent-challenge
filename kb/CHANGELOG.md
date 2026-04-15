@@ -31,6 +31,29 @@ Every new document must be listed here with its injection test result.
 
 ---
 
+## 2026-04-15
+
+### Added
+- `kb/domain/sql_query_conventions.md` — SQL/DB behavioral rules for query generation:
+
+### Fixed
+- `kb/corrections/corrections_log.md` — KB consolidation: replaced 10 legacy tool-routing
+  failure entries (tool name does not exist) with 4 seeded bracket-format entries covering
+  the most common DAB failure patterns: wrong table name (bookreview), NULL metric ordering
+  (books_database), yelp join key prefix mismatch (businessid_N ↔ businessref_N), and
+  Salesforce Id '#' prefix join failure. Legacy entries had no SQL corrections and were
+  polluting the proactive-correction similarity search.
+  NULL ordering (PostgreSQL sorts NULLs first in DESC), SQLite/DuckDB NULL order,
+  aggregation with NULLs, case-sensitive LIKE, LIMIT hygiene, date handling,
+  MongoDB pipeline routing, boolean field encoding across datasets.
+
+### Injection Test Status
+| Document | Test run | Injected content detected | Outcome |
+|---|---|---|---|
+| sql_query_conventions.md | pending | — | — |
+
+---
+
 ## Instructions for Adding a Document
 
 1. Create the `.md` file in the appropriate `kb/` subdirectory.

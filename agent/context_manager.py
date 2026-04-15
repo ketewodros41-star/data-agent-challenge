@@ -315,6 +315,9 @@ class ContextManager:
                     schema[db_name] = introspect_schema(
                         db_name, config, self._toolbox.call_tool
                     )
+                else:
+                    # Architecture requires MCP for Layer 1; without it, we return empty schema
+                    print(f"[ContextManager] Warning: skipping {db_name} - no MCP toolbox provided.")
             except Exception as exc:
                 # Non-fatal: agent can still work with the databases it can reach
                 print(f"[ContextManager] Warning: could not introspect {db_name}: {exc}")

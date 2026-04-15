@@ -134,6 +134,18 @@ class SelfCorrectionLoop:
             failures = [r for r in results if not r.success]
 
             if not failures:
+                # Log verified outcome for any corrections applied on this attempt
+                if correction_applied and attempt > 0:
+                    for sq in current_plan.sub_queries:
+                        if "[corrected:" in sq.description or "[proactive-correction]" in sq.description:
+                            self._ctx.log_correction(
+                                query=sq.query,
+                                failure_cause="(previous failure — see prior entry)",
+                                correction="correction verified successful",
+                                database=sq.database,
+                                root_cause="(see prior entry)",
+                                outcome=f"success on attempt {attempt + 1}",
+                            )
                 return {
                     "results": results,
                     "correction_applied": correction_applied,
@@ -312,30 +324,58 @@ class SelfCorrectionLoop:
         Self-learning loop: before the first execution attempt, check Layer 3
         for similar past failures and apply the known fix proactively.
 
-        When a match is found the LLM rewrites the query incorporating the
-        stored correction.  On the second run correction_applied=True is set
-        in the trace without ever hitting the failure again.
+        Searches by the NL question (stable across iterations at temperature=0)
+        and uses the stored corrected query directly — no extra LLM round-trip
+        needed because the correction field already holds the full corrected SQL.
+        On the second run correction_applied=True is set in the trace without
+        ever hitting the failure again.
         """
         corrected_sub_queries = list(plan.sub_queries)
         any_corrected = False
 
         for idx, sq in enumerate(plan.sub_queries):
             try:
-                similar = self._ctx.get_similar_corrections(sq.query)
+                # Search by NL question — keyed that way in _correct_plan
+                similar = self._ctx.get_similar_corrections(question)
+                # Only use corrections that were logged for this specific database
+                similar = [
+                    e for e in similar
+                    if e.database is None or e.database == sq.database
+                ]
             except Exception:
                 continue
 
-            if not similar or not isinstance(similar, list) or len(similar) == 0:
+            if not similar:
                 continue
 
             latest = similar[-1]
-            corrected_query = self._llm_apply_correction(
-                question=question,
-                query=sq.query,
-                correction_description=getattr(latest, "correction", ""),
-                failure_cause=getattr(latest, "failure_cause", ""),
-                db_name=sq.database,
+            correction_str = getattr(latest, "correction", "").strip()
+
+            # Strip strategy-type prefix written by old code (e.g. "regenerate_query: SELECT ...")
+            _STRATEGY_PREFIXES = (
+                "regenerate_query:", "transform_join_key:", "apply_quality_rules:",
+                "alternative_extraction:", "reroute_database:",
             )
+            for _pfx in _STRATEGY_PREFIXES:
+                if correction_str.lower().startswith(_pfx):
+                    correction_str = correction_str[len(_pfx):].strip()
+                    break
+
+            # The correction field holds the full corrected SQL — use it directly.
+            # Fall back to an LLM rewrite only when the stored value looks like a
+            # description rather than a runnable query.
+            if correction_str and correction_str.upper().startswith(
+                ("SELECT", "WITH", "INSERT", "UPDATE", "DELETE", "[{", "DB.")
+            ):
+                corrected_query = correction_str
+            else:
+                corrected_query = self._llm_apply_correction(
+                    question=question,
+                    query=sq.query,
+                    correction_description=correction_str,
+                    failure_cause=getattr(latest, "failure_cause", ""),
+                    db_name=sq.database,
+                )
 
             if corrected_query and corrected_query != sq.query:
                 corrected_sub_queries[idx] = SubQuery(
@@ -422,16 +462,18 @@ class SelfCorrectionLoop:
             if corrected_query is None:
                 continue
 
-            # 8.4 log to Layer 3
+            # 8.4 log to Layer 3 — key by NL question (stable across iterations),
+            # store the FULL corrected SQL so _apply_proactive_corrections can
+            # use it verbatim on the next run without an extra LLM call.
             self._ctx.log_correction(
-                query=original_sq.query,
+                query=question,
                 failure_cause=(
                     f"{failure_info.failure_type}: {failure_info.error_message}"
                 ),
-                correction=(
-                    f"{strategy.strategy_type}: {corrected_query[:120]}"
-                ),
+                correction=corrected_query,
                 database=failure_result.database,
+                root_cause=diagnosis.root_cause,
+                outcome="pending verification",
             )
 
             corrected_sub_queries[idx] = SubQuery(

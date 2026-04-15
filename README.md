@@ -55,23 +55,27 @@ The current system supports:
 
 ## Live Agent / Shared Server
 
-The agent is running on the shared AWS EC2 server and accessible publicly.
+ **For facilitators and team members only.** Access credentials available in `FACILITATOR_GUIDE.md`.
 
-| Endpoint | URL |
-|---|---|
-| **Agent landing page** | http://184.73.53.81/ |
-| **Health check** | http://184.73.53.81/health |
-| **Query API** | `POST http://184.73.53.81/answer` |
-| MCP Toolbox UI | http://184.73.53.81:5000/ui *(from server; needs VPN or SSH tunnel externally)* |
+The agent runs on a shared server. To query it:
 
-### Try the live agent
+1. **Via SSH tunnel** (recommended for team access):
+   ```bash
+   ssh ubuntu@<SERVER_IP> -L 8080:localhost:8080
+   curl http://localhost:8080/health
+   ```
+
+2. **Direct access** (requires authorization):
+   Contact the team lead for the server address and API key.
+
+### Test the agent locally (after `./setup_dab.sh`)
 
 ```bash
 # Health check
-curl http://184.73.53.81/health
+curl http://127.0.0.1:8080/health
 
 # Ask a question
-curl -s http://184.73.53.81/answer \
+curl -s http://127.0.0.1:8080/answer \
   -H "Content-Type: application/json" \
   -d '{"question": "How many businesses are in the yelp dataset?", "dataset": "yelp"}' \
   | python3 -m json.tool
@@ -102,9 +106,11 @@ that proxies port 80 → 8080.
 ### SSH into the shared server
 
 ```bash
-ssh ubuntu@184.73.53.81
+ssh ubuntu@<SERVER_IP>
 cd /home/yosef/data-agent-challenge
 ```
+
+*Server address available in `FACILITATOR_GUIDE.md` (for team use only).*
 
 ## Fresh Machine Setup
 
@@ -346,10 +352,4 @@ What is working now:
 - sandbox-backed extraction and merge operations
 - DAB-style query export for BookReview
 - typed traces for runtime and benchmark artifacts
-
-
-What still needs final team packaging:
-
-- replace the live server placeholders with the real shared-server access details
-- add the final photographed architecture diagram if the team wants a hand-drawn version in the README
-- add final Pass@1 numbers after the full benchmark run
+- real shared-server access

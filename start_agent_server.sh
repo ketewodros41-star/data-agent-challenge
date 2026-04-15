@@ -117,11 +117,11 @@ case "${CMD}" in
     _start_proxy
 
     echo ""
-    echo "Live agent:"
-    PUBLIC_IP=$(curl -sf --max-time 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "184.73.53.81")
-    echo "  Landing page : http://${PUBLIC_IP}/"
-    echo "  Health check : http://${PUBLIC_IP}/health"
-    echo "  Query API    : POST http://${PUBLIC_IP}/answer"
+    echo "✓ Agent is running on port ${AGENT_PORT}"
+    echo "  Access locally : http://localhost:${AGENT_PORT}/health"
+    echo "  Public access  : See FACILITATOR_GUIDE.md (not in repo)"
+    echo ""
+    echo "nginx proxy running on port 80 → ${AGENT_PORT}"
     ;;
 
   *)

@@ -99,13 +99,13 @@ Content-Type: application/json
 stockindex · PANCANCER_ATLAS · DEPS_DEV_V1 · GITHUB_REPOS</code></pre>
 
   <h2>Example (curl)</h2>
-  <pre><code>curl -s http://184.73.53.81:8080/answer \\
+  <pre><code>curl -s http://localhost:8080/answer \\
   -H 'Content-Type: application/json' \\
   -d '{"question": "How many businesses are there?", "dataset": "yelp"}' \\
   | python3 -m json.tool</code></pre>
 
   <h2>MCP Toolbox UI</h2>
-  <p><a href="http://184.73.53.81:5000/ui" target="_blank">http://184.73.53.81:5000/ui</a></p>
+  <p>Available via SSH tunnel from localhost:5000</p>
 </body>
 </html>
 """
@@ -245,9 +245,9 @@ def main() -> None:
 
     server = ThreadingHTTPServer((args.host, args.port), AgentHandler)
     print(f"Oracle Forge Agent API listening on http://{args.host}:{args.port}", flush=True)
-    print(f"Landing page : http://184.73.53.81:{args.port}/", flush=True)
-    print(f"Health check : http://184.73.53.81:{args.port}/health", flush=True)
-    print(f"Query API    : POST http://184.73.53.81:{args.port}/answer", flush=True)
+    print(f"Landing page : http://localhost:{args.port}/", flush=True)
+    print(f"Health check : http://localhost:{args.port}/health", flush=True)
+    print(f"Query API    : POST http://localhost:{args.port}/answer", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

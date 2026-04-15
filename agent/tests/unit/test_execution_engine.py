@@ -44,9 +44,47 @@ def test_build_tool_call_routes_sqlite_and_mongodb():
     )
 
     assert sqlite_tool == "sqlite_query"
-    assert sqlite_params == {"query": "select 1"}
+    assert sqlite_params == {"sql": "select 1"}
     assert mongo_tool == "find_yelp_checkins"
     assert mongo_params["limit"] == 20
+
+
+def test_build_tool_call_uses_sqlite_mcp_tool_override():
+    engine = ExecutionEngine(
+        toolbox=StubToolbox([]),
+        db_configs={
+            "bookreview_sqlite": {
+                "type": "sqlite",
+                "mcp_tool": "sqlite_bookreview_query",
+            }
+        },
+    )
+
+    sqlite_tool, sqlite_params = engine._build_tool_call(
+        SubQuery(database="bookreview_sqlite", query="select 1", query_type="sqlite")
+    )
+
+    assert sqlite_tool == "sqlite_bookreview_query"
+    assert sqlite_params == {"sql": "select 1"}
+
+
+def test_build_tool_call_uses_duckdb_mcp_tool_override():
+    engine = ExecutionEngine(
+        toolbox=StubToolbox([]),
+        db_configs={
+            "stockmarket_duckdb": {
+                "type": "duckdb",
+                "mcp_tool": "duckdb_stockmarket_query",
+            }
+        },
+    )
+
+    duckdb_tool, duckdb_params = engine._build_tool_call(
+        SubQuery(database="stockmarket_duckdb", query="select 1", query_type="duckdb")
+    )
+
+    assert duckdb_tool == "duckdb_stockmarket_query"
+    assert duckdb_params == {"sql": "select 1"}
 
 
 def test_join_datasets_applies_format_transformation():

@@ -1,0 +1,379 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLBOX_BIN="${ROOT_DIR}/bin/toolbox"
+TOOLS_CONFIG="${ROOT_DIR}/mcp/tools.yaml"
+RUNTIME_TOOLS_CONFIG="${TOOLS_CONFIG}"
+
+read_env_value() {
+  local key="$1"
+  local env_file="${ROOT_DIR}/.env"
+  if [[ ! -f "${env_file}" ]]; then
+    return 1
+  fi
+  awk -F '=' -v target="${key}" '
+    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
+      value = substr($0, index($0, "=") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "${env_file}"
+}
+
+TOOLBOX_URL="${TOOLBOX_URL:-$(read_env_value TOOLBOX_URL || true)}"
+TOOLBOX_URL="${TOOLBOX_URL:-http://127.0.0.1:5000}"
+
+stripped_url="${TOOLBOX_URL#http://}"
+stripped_url="${stripped_url#https://}"
+host_port="${stripped_url%%/*}"
+address="${host_port%%:*}"
+port="${host_port##*:}"
+
+if [[ "${host_port}" == "${address}" ]]; then
+  if [[ "${TOOLBOX_URL}" == https://* ]]; then
+    port="443"
+  else
+    port="80"
+  fi
+fi
+
+if [[ ! -x "${TOOLBOX_BIN}" ]]; then
+  echo "Toolbox binary not found or not executable: ${TOOLBOX_BIN}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${TOOLS_CONFIG}" ]]; then
+  echo "Toolbox config not found: ${TOOLS_CONFIG}" >&2
+  exit 1
+fi
+
+PG_HOST="${PG_HOST:-$(read_env_value PG_HOST || true)}"
+PG_HOST="${PG_HOST:-127.0.0.1}"
+PG_PORT="${PG_PORT:-$(read_env_value PG_PORT || true)}"
+PG_PORT="${PG_PORT:-55432}"
+PG_DATABASE="${PG_DATABASE:-$(read_env_value PG_DATABASE || true)}"
+PG_DATABASE="${PG_DATABASE:-bookreview_db}"
+PG_USER="${PG_USER:-$(read_env_value PG_USER || true)}"
+PG_USER="${PG_USER:-postgres}"
+PG_PASSWORD="${PG_PASSWORD:-$(read_env_value PG_PASSWORD || true)}"
+PG_PASSWORD="${PG_PASSWORD:-teampalm}"
+MONGO_URI_FROM_ENV="${MONGO_URI:-$(read_env_value MONGO_URI || true)}"
+MONGODB_URI="${MONGODB_URI:-$(read_env_value MONGODB_URI || true)}"
+MONGODB_URI="${MONGODB_URI:-${MONGO_URI_FROM_ENV:-mongodb://127.0.0.1:57017}}"
+DAB_DATASET_ROOT="${DAB_DATASET_ROOT:-$(read_env_value DAB_DATASET_ROOT || true)}"
+DAB_DATASET_ROOT="${DAB_DATASET_ROOT:-${HOME}/DataAgentBench}"
+
+temp_config="$(mktemp /tmp/toolbox-config.XXXXXX.yaml)"
+trap 'rm -f "${temp_config}"' EXIT
+
+cat > "${temp_config}" <<EOF
+sources:
+  postgres_main:
+    kind: postgres
+    host: ${PG_HOST}
+    port: ${PG_PORT}
+    database: ${PG_DATABASE}
+    user: ${PG_USER}
+    password: ${PG_PASSWORD}
+
+  mongo_main:
+    kind: mongodb
+    uri: ${MONGODB_URI}
+
+  sqlite_bookreview:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_bookreview/query_dataset/review_query.db
+
+  sqlite_googlelocal:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_googlelocal/query_dataset/review_query.db
+
+  sqlite_agnews:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_agnews/query_dataset/metadata.db
+
+  sqlite_crm_core:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/core_crm.db
+
+  sqlite_crm_products:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/products_orders.db
+
+  sqlite_crm_territory:
+    kind: sqlite
+    database: ${DAB_DATASET_ROOT}/query_crmarenapro/query_dataset/territory.db
+
+tools:
+  postgres-database-overview:
+    kind: postgres-database-overview
+    source: postgres_main
+    description: Return a high-level overview of the PostgreSQL database.
+
+  postgres-execute-sql:
+    kind: postgres-execute-sql
+    source: postgres_main
+    description: Execute SQL against the PostgreSQL database.
+
+  postgres-get-column-cardinality:
+    kind: postgres-get-column-cardinality
+    source: postgres_main
+    description: Return distinct-value cardinality for PostgreSQL columns.
+
+  postgres-list-active-queries:
+    kind: postgres-list-active-queries
+    source: postgres_main
+    description: List active PostgreSQL queries.
+
+  postgres-list-available-extensions:
+    kind: postgres-list-available-extensions
+    source: postgres_main
+    description: List PostgreSQL extensions available for installation.
+
+  postgres-list-database-stats:
+    kind: postgres-list-database-stats
+    source: postgres_main
+    description: List PostgreSQL database statistics.
+
+  postgres-list-indexes:
+    kind: postgres-list-indexes
+    source: postgres_main
+    description: List PostgreSQL indexes.
+
+  postgres-list-installed-extensions:
+    kind: postgres-list-installed-extensions
+    source: postgres_main
+    description: List installed PostgreSQL extensions.
+
+  postgres-list-locks:
+    kind: postgres-list-locks
+    source: postgres_main
+    description: List PostgreSQL locks.
+
+  postgres-list-pg-settings:
+    kind: postgres-list-pg-settings
+    source: postgres_main
+    description: List PostgreSQL runtime settings.
+
+  postgres-list-publication-tables:
+    kind: postgres-list-publication-tables
+    source: postgres_main
+    description: List PostgreSQL publication tables.
+
+  postgres-list-query-stats:
+    kind: postgres-list-query-stats
+    source: postgres_main
+    description: List PostgreSQL query statistics.
+
+  postgres-list-roles:
+    kind: postgres-list-roles
+    source: postgres_main
+    description: List PostgreSQL roles.
+
+  postgres-list-schemas:
+    kind: postgres-list-schemas
+    source: postgres_main
+    description: List PostgreSQL schemas.
+
+  postgres-list-sequences:
+    kind: postgres-list-sequences
+    source: postgres_main
+    description: List PostgreSQL sequences.
+
+  postgres-list-stored-procedure:
+    kind: postgres-list-stored-procedure
+    source: postgres_main
+    description: List PostgreSQL stored procedures.
+
+  postgres-list-table-stats:
+    kind: postgres-list-table-stats
+    source: postgres_main
+    description: List PostgreSQL table statistics.
+
+  postgres-list-tables:
+    kind: postgres-list-tables
+    source: postgres_main
+    description: List PostgreSQL tables.
+
+  postgres-list-tablespaces:
+    kind: postgres-list-tablespaces
+    source: postgres_main
+    description: List PostgreSQL tablespaces.
+
+  postgres-list-triggers:
+    kind: postgres-list-triggers
+    source: postgres_main
+    description: List PostgreSQL triggers.
+
+  postgres-list-views:
+    kind: postgres-list-views
+    source: postgres_main
+    description: List PostgreSQL views.
+
+  postgres-long-running-transactions:
+    kind: postgres-long-running-transactions
+    source: postgres_main
+    description: List long-running PostgreSQL transactions.
+
+  postgres-replication-stats:
+    kind: postgres-replication-stats
+    source: postgres_main
+    description: List PostgreSQL replication statistics.
+
+  postgres-sql:
+    kind: postgres-execute-sql
+    source: postgres_main
+    description: Execute read-only SQL against the PostgreSQL database.
+
+  run_query:
+    kind: postgres-execute-sql
+    source: postgres_main
+    description: Execute read-only SQL against PostgreSQL using a generic query parameter.
+
+  list_tables:
+    kind: postgres-sql
+    source: postgres_main
+    description: List all tables in the bookreview database.
+    statement: |
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+      ORDER BY table_schema, table_name;
+
+  describe_books_info:
+    kind: postgres-sql
+    source: postgres_main
+    description: Describe columns in the books_info table.
+    statement: |
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'books_info'
+      ORDER BY ordinal_position;
+
+  preview_books_info:
+    kind: postgres-sql
+    source: postgres_main
+    description: Preview rows from books_info.
+    statement: |
+      SELECT *
+      FROM books_info
+      LIMIT 10;
+
+  find_yelp_businesses:
+    kind: mongodb-find
+    source: mongo_main
+    database: yelp_db
+    collection: business
+    filterPayload: "{}"
+    limit: 5
+    description: Find documents in the Yelp business collection.
+
+  find_yelp_checkins:
+    kind: mongodb-find
+    source: mongo_main
+    database: yelp_db
+    collection: checkin
+    filterPayload: "{}"
+    limit: 5
+    description: Find documents in the Yelp checkin collection.
+
+  sqlite_bookreview_query:
+    kind: sqlite-execute-sql
+    source: sqlite_bookreview
+    description: Execute SQL against the BookReview SQLite review database.
+
+  sqlite_googlelocal_query:
+    kind: sqlite-execute-sql
+    source: sqlite_googlelocal
+    description: Execute SQL against the GoogleLocal SQLite review database.
+
+  sqlite_agnews_query:
+    kind: sqlite-execute-sql
+    source: sqlite_agnews
+    description: Execute SQL against the AG News SQLite metadata database.
+
+  sqlite_crm_core_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_core
+    description: Execute SQL against the CRM Arena Pro core SQLite database.
+
+  sqlite_crm_products_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_products
+    description: Execute SQL against the CRM Arena Pro products/orders SQLite database.
+
+  sqlite_crm_territory_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_territory
+    description: Execute SQL against the CRM Arena Pro territory SQLite database.
+
+toolsets:
+  oracle_forge:
+    tools:
+      - postgres-database-overview
+      - postgres-execute-sql
+      - postgres-get-column-cardinality
+      - postgres-list-active-queries
+      - postgres-list-available-extensions
+      - postgres-list-database-stats
+      - postgres-list-indexes
+      - postgres-list-installed-extensions
+      - postgres-list-locks
+      - postgres-list-pg-settings
+      - postgres-list-publication-tables
+      - postgres-list-query-stats
+      - postgres-list-roles
+      - postgres-list-schemas
+      - postgres-list-sequences
+      - postgres-list-stored-procedure
+      - postgres-list-table-stats
+      - postgres-list-tables
+      - postgres-list-tablespaces
+      - postgres-list-triggers
+      - postgres-list-views
+      - postgres-long-running-transactions
+      - postgres-replication-stats
+      - postgres-sql
+      - run_query
+      - list_tables
+      - describe_books_info
+      - preview_books_info
+      - find_yelp_businesses
+      - find_yelp_checkins
+      - sqlite_bookreview_query
+      - sqlite_googlelocal_query
+      - sqlite_agnews_query
+      - sqlite_crm_core_query
+      - sqlite_crm_products_query
+      - sqlite_crm_territory_query
+EOF
+
+RUNTIME_TOOLS_CONFIG="${temp_config}"
+
+forward_args=("$@")
+has_ui=false
+has_enable_api=false
+
+for arg in "${forward_args[@]}"; do
+  if [[ "${arg}" == "--ui" ]]; then
+    has_ui=true
+  fi
+  if [[ "${arg}" == "--enable-api" ]]; then
+    has_enable_api=true
+  fi
+done
+
+if [[ "${has_ui}" == true && "${has_enable_api}" == false ]]; then
+  forward_args=("--enable-api" "${forward_args[@]}")
+fi
+
+exec "${TOOLBOX_BIN}" \
+  --config "${RUNTIME_TOOLS_CONFIG}" \
+  --address "${address}" \
+  --port "${port}" \
+  --toolbox-url "${TOOLBOX_URL}" \
+  "${forward_args[@]}"

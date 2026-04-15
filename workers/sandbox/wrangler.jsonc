@@ -1,5 +1,6 @@
 {
-  "name": "data-agent-challenge-sandbox",
-  "compatibility_date": "2026-04-10",
+  "name": "sandbox",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
   "main": "src/index.js"
 }

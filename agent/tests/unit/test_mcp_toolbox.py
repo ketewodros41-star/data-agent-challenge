@@ -1,7 +1,6 @@
 import json
 import unittest
-from types import ModuleType
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from agent.mcp_toolbox import MCPToolbox
 
@@ -51,40 +50,38 @@ class MCPToolboxTests(unittest.TestCase):
         self.assertEqual(result.source_type, "postgres")
         self.assertEqual(result.tool_name, "list_tables")
 
-    def test_call_tool_routes_duckdb_queries_directly(self) -> None:
-        client = MCPToolbox()
+    def test_call_tool_routes_duckdb_queries_to_duckdb_mcp(self) -> None:
+        client = MCPToolbox("http://127.0.0.1:5000", duckdb_mcp_url="http://127.0.0.1:8001")
+        payload = {"result": [{"id": 1, "name": "book"}]}
 
-        connection = MagicMock()
-        connection.execute.return_value.fetchall.return_value = [(1, "book")]
-        connection.description = [("id",), ("name",)]
-
-        duckdb_module = ModuleType("duckdb")
-        duckdb_module.connect = MagicMock(return_value=connection)
-
-        with patch.dict("sys.modules", {"duckdb": duckdb_module}):
+        with patch("agent.mcp_toolbox.urllib.request.urlopen", return_value=FakeResponse(payload)) as urlopen_mock:
             result = client.call_tool("duckdb_query", {"query": "select 1 as id, 'book' as name"})
 
         self.assertTrue(result.success)
         self.assertEqual(result.data, [{"id": 1, "name": "book"}])
         self.assertEqual(result.source_type, "duckdb")
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.full_url, "http://127.0.0.1:8001/api/tool/duckdb_query/invoke")
 
     def test_verify_connections_reports_http_and_duckdb(self) -> None:
         client = MCPToolbox("http://127.0.0.1:5000")
-
-        duckdb_connection = MagicMock()
-        duckdb_connection.execute.return_value.fetchone.return_value = (1,)
-        duckdb_module = ModuleType("duckdb")
-        duckdb_module.connect = MagicMock(return_value=duckdb_connection)
 
         mcp_payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "result": {"tools": [{"name": "list_tables"}]},
         }
+        duckdb_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"tools": [{"name": "duckdb_stockmarket_query"}]},
+        }
 
-        with patch("agent.mcp_toolbox.urllib.request.urlopen", return_value=FakeResponse(mcp_payload)):
-            with patch.dict("sys.modules", {"duckdb": duckdb_module}):
-                result = client.verify_connections()
+        with patch(
+            "agent.mcp_toolbox.urllib.request.urlopen",
+            side_effect=[FakeResponse(mcp_payload), FakeResponse(duckdb_payload)],
+        ):
+            result = client.verify_connections()
 
         self.assertTrue(result["toolbox_http"])
         self.assertTrue(result["duckdb"])

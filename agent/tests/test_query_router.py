@@ -76,6 +76,15 @@ def _mock_router(entity_text="[]", query_text="SELECT 1"):
 # ── 5.1 Entity extraction & DB assignment ──────────────────────────────────────
 
 class TestDatabaseAssignment:
+    def test_extract_entities_falls_back_to_local_identifiers_on_llm_error(self):
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = RuntimeError("provider unavailable")
+        router = QueryRouter(client=mock_client)
+
+        entities = router._extract_entities("what columns does the books_info table have")
+
+        assert "books_info" in entities
+
     def test_hint_routing_reviews_to_mongodb(self):
         router = QueryRouter(client=MagicMock())
         bundle = _make_bundle(
@@ -156,6 +165,24 @@ class TestDatabaseAssignment:
         )
         assert "postgres" in assignment
         assert "mongodb" in assignment
+
+    def test_route_uses_local_entity_fallback_for_schema_question(self):
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = [
+            RuntimeError("provider unavailable"),
+            MagicMock(content=[MagicMock(text="SELECT column_name FROM information_schema.columns")]),
+        ]
+        router = QueryRouter(client=mock_client)
+        bundle = _make_bundle(pg_tables={"books_info": ["title", "author"]})
+
+        plan = router.route(
+            "what columns does the books_info table have",
+            bundle,
+            ["postgres"],
+        )
+
+        assert plan.sub_queries
+        assert plan.sub_queries[0].database == "postgres"
 
 
 # ── 5.3 Dialect detection ─────────────────────────────────────────────────────

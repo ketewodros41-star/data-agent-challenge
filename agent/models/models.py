@@ -55,6 +55,8 @@ class CorrectionEntry:
     correction: str
     timestamp: datetime
     database: Optional[str] = None
+    root_cause: str = ""   # WHY it went wrong (diagnosis), distinct from failure_cause (symptom)
+    outcome: str = ""      # Result after fix — must be verified, not assumed
 
 
 @dataclass

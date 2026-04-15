@@ -3,18 +3,19 @@ Execution Engine.
 
 Responsibilities:
 1. Dialect translation (SQL / MongoDB aggregation / DuckDB analytical SQL)
-2. Query execution via MCPToolbox
+2. Query execution via MCP services
 3. Result merging (multi-database joins)
 4. Result validation (types, nulls, integrity)
 5. Format transformation (join key resolution)
 
 Routing:
   PostgreSQL / SQLite / MongoDB  → HTTP Google MCP Toolbox (team-dab-toolbox)
-  DuckDB                         → direct duckdb Python driver (via MCPToolbox)
+  DuckDB                         → HTTP custom DuckDB MCP service
 """
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Optional
 
 from agent.models.models import (
@@ -28,22 +29,228 @@ from .mcp_toolbox import MCPToolbox
 
 
 class ExecutionEngine:
-    """Execute query plans, returning one QueryResult per sub-query."""
+    """Execute query plans, returning one QueryResult per sub-query.
+
+    Supports two calling conventions:
+
+    **Legacy** (``QueryPlan`` from ``agent.models.models``):
+        ``engine = ExecutionEngine(toolbox=..., db_configs=...)``
+        ``results: List[QueryResult] = engine.execute_plan(query_plan, context)``
+
+    **Typed scaffold** (``ExecutionPlan`` from ``agent.types``):
+        ``engine = ExecutionEngine(mcp_client=..., sandbox_client=..., self_correction=...)``
+        ``result: ExecutionResult = engine.execute_plan(execution_plan, context)``
+    """
 
     def __init__(
         self,
         toolbox: Optional[MCPToolbox] = None,
         db_configs: Optional[Dict[str, dict]] = None,
+        # Typed scaffold parameters
+        mcp_client: Optional[Any] = None,
+        sandbox_client: Optional[Any] = None,
+        self_correction: Optional[Any] = None,
     ):
+        # Legacy interface
         self._db_configs: Dict[str, dict] = db_configs or {}
         self.toolbox = toolbox or MCPToolbox(db_configs=self._db_configs)
+        # Typed scaffold interface
+        self._mcp_client = mcp_client
+        self._sandbox_client = sandbox_client
+        if self_correction is None:
+            from agent.self_correction import SelfCorrectionLoop
+            self._self_correction: Any = SelfCorrectionLoop()
+        else:
+            self._self_correction = self_correction
 
     def execute_plan(
+        self,
+        plan: Any,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Execute a plan.  Dispatches to the typed or legacy path by plan type."""
+        from agent.types import ExecutionPlan as _TypedPlan
+        if isinstance(plan, _TypedPlan):
+            return self._typed_execute_plan(plan, context or {})
+        return self._legacy_execute_plan(plan, context if context is not None else {})
+
+    # ── Typed scaffold execution ──────────────────────────────────────────────
+
+    def _typed_execute_plan(
+        self,
+        plan: Any,
+        context: Dict[str, Any],
+    ) -> Any:
+        """Execute a typed ``ExecutionPlan``, returning an ``ExecutionResult``."""
+        from agent.types import (
+            ExecutionResult,
+            ExecutionStatus,
+            ExecutionTrace,
+            FailureRecord,
+            MCPToolCall,
+            SandboxExecutionRequest,
+            StepKind,
+            StepRoute,
+        )
+
+        trace: List[Any] = []
+        attempts = 0
+        correction_applied = False
+        current_plan = plan
+
+        while True:
+            attempts += 1
+            attempt_outputs: Dict[str, Any] = {}
+            attempt_trace: List[Any] = []
+            failed_step = None
+            failed_error = ""
+
+            for step in current_plan.steps:
+                t0 = time.monotonic()
+
+                if step.kind == StepKind.DATABASE:
+                    tool_call = MCPToolCall(
+                        tool_name=step.tool_name,
+                        parameters=step.parameters or {},
+                    )
+                    tool_result = self._mcp_client.call_tool(tool_call)
+                    elapsed = time.monotonic() - t0
+
+                    if tool_result.success:
+                        if step.output_key:
+                            attempt_outputs[step.output_key] = tool_result.data
+                        attempt_trace.append(ExecutionTrace(
+                            step_id=step.step_id,
+                            step_kind=step.kind,
+                            route=StepRoute.MCP_TOOLBOX,
+                            status=ExecutionStatus.SUCCEEDED,
+                            attempt=attempts,
+                            execution_time=elapsed,
+                            output=tool_result.data,
+                            output_key=step.output_key,
+                        ))
+                    else:
+                        attempt_trace.append(ExecutionTrace(
+                            step_id=step.step_id,
+                            step_kind=step.kind,
+                            route=StepRoute.MCP_TOOLBOX,
+                            status=ExecutionStatus.FAILED,
+                            attempt=attempts,
+                            execution_time=elapsed,
+                            error=tool_result.error,
+                        ))
+                        failed_step = step
+                        failed_error = tool_result.error or "Tool call failed"
+                        break
+
+                else:  # TRANSFORM, MERGE, VALIDATE, EXTRACT → sandbox
+                    inputs_payload = {
+                        ref: attempt_outputs.get(ref)
+                        for ref in (step.input_refs or [])
+                    }
+                    sandbox_request = SandboxExecutionRequest(
+                        code_plan=step.code or "",
+                        trace_id=f"{step.step_id}:attempt-{attempts}",
+                        inputs_payload=inputs_payload,
+                        step_id=step.step_id,
+                        context={"shared_context": context},
+                    )
+                    sandbox_result = self._sandbox_client.execute(sandbox_request)
+                    elapsed = time.monotonic() - t0
+
+                    metadata: Dict[str, Any] = {
+                        "validation_status": sandbox_result.validation_status
+                    }
+                    if sandbox_result.trace:
+                        metadata["sandbox_trace"] = sandbox_result.trace
+
+                    if sandbox_result.success:
+                        if step.output_key:
+                            attempt_outputs[step.output_key] = sandbox_result.result
+                        attempt_trace.append(ExecutionTrace(
+                            step_id=step.step_id,
+                            step_kind=step.kind,
+                            route=StepRoute.SANDBOX,
+                            status=ExecutionStatus.SUCCEEDED,
+                            attempt=attempts,
+                            execution_time=elapsed,
+                            output=sandbox_result.result,
+                            output_key=step.output_key,
+                            metadata=metadata,
+                        ))
+                    else:
+                        error = sandbox_result.error_if_any or "Sandbox execution failed"
+                        attempt_trace.append(ExecutionTrace(
+                            step_id=step.step_id,
+                            step_kind=step.kind,
+                            route=StepRoute.SANDBOX,
+                            status=ExecutionStatus.FAILED,
+                            attempt=attempts,
+                            execution_time=elapsed,
+                            error=error,
+                            metadata=metadata,
+                        ))
+                        failed_step = step
+                        failed_error = error
+                        break
+
+            if failed_step is None:
+                final_output = attempt_outputs.get(current_plan.final_output_key)
+                return ExecutionResult(
+                    success=True,
+                    status=ExecutionStatus.SUCCEEDED,
+                    final_output=final_output,
+                    outputs=attempt_outputs,
+                    trace=trace + attempt_trace,
+                    attempts=attempts,
+                    correction_applied=correction_applied,
+                )
+
+            # Consult self-correction loop
+            failure = FailureRecord(
+                step_id=failed_step.step_id,
+                route=(
+                    StepRoute.MCP_TOOLBOX
+                    if failed_step.kind == StepKind.DATABASE
+                    else StepRoute.SANDBOX
+                ),
+                error=failed_error,
+                attempt=attempts,
+                trace=trace + attempt_trace,
+            )
+            decision = self._self_correction.handle_failure(current_plan, failure)
+
+            if not decision.retryable or attempts >= current_plan.max_retries:
+                return ExecutionResult(
+                    success=False,
+                    status=ExecutionStatus.FAILED,
+                    trace=trace + attempt_trace,
+                    attempts=attempts,
+                    correction_applied=correction_applied,
+                    error=failed_error,
+                )
+
+            correction_trace = ExecutionTrace(
+                step_id=failed_step.step_id,
+                step_kind=failed_step.kind,
+                route=StepRoute.SELF_CORRECTION,
+                status=ExecutionStatus.RETRYING,
+                attempt=attempts,
+                execution_time=0.0,
+                metadata={"reason": decision.reason},
+            )
+            trace = trace + attempt_trace + [correction_trace]
+            correction_applied = True
+            current_plan = decision.updated_plan or current_plan
+
+    # ── Legacy execution ──────────────────────────────────────────────────────
+
+    def _legacy_execute_plan(
         self,
         plan: QueryPlan,
         context: Dict[str, Any],
     ) -> List[QueryResult]:
-        """Execute each sub-query in plan order and return per-DB results."""
+        """Execute a legacy ``QueryPlan``, returning a list of ``QueryResult``."""
         results: List[QueryResult] = []
 
         for idx in plan.execution_order:
@@ -63,15 +270,29 @@ class ExecutionEngine:
                     )
                 else:
                     data = tool_result.data
-                    rows = len(data) if isinstance(data, list) else 1
-                    results.append(
-                        QueryResult(
-                            database=sq.database,
-                            data=data,
-                            success=True,
-                            rows_affected=rows,
+                    # The MCP toolbox sometimes returns a DB error as a 200 OK with
+                    # {"error": "..."} embedded in the content.  Detect and surface it
+                    # so the self-correction loop can react to the real failure.
+                    embedded_error = self._extract_embedded_error(data)
+                    if embedded_error:
+                        results.append(
+                            QueryResult(
+                                database=sq.database,
+                                data=None,
+                                error=embedded_error,
+                                success=False,
+                            )
                         )
-                    )
+                    else:
+                        rows = len(data) if isinstance(data, list) else 1
+                        results.append(
+                            QueryResult(
+                                database=sq.database,
+                                data=data,
+                                success=True,
+                                rows_affected=rows,
+                            )
+                        )
             except Exception as exc:
                 results.append(
                     QueryResult(
@@ -106,11 +327,41 @@ class ExecutionEngine:
 
         return results
 
+    @staticmethod
+    def _extract_embedded_error(data: Any) -> Optional[str]:
+        """
+        Detect DB errors embedded inside a nominally-successful MCP response.
+
+        The Google MCP Toolbox returns HTTP 200 even for query errors, with the
+        error message encoded as ``[{"error": "..."}]`` in the content payload.
+        Return the error string so callers can surface it as a real failure.
+        """
+        if isinstance(data, list) and data:
+            first = data[0]
+            if isinstance(first, dict) and "error" in first and len(first) == 1:
+                return str(first["error"])
+            # String element that starts with the toolbox error prefix
+            if isinstance(first, str) and first.startswith("error processing request"):
+                return first
+        if isinstance(data, str) and data.startswith("error processing request"):
+            return data
+        return None
+
+    # Mapping: logical db_id → the postgres-execute-sql tool name in tools.yaml.
+    # Each PostgreSQL database has its own tool so queries hit the right database.
+    _PG_TOOL_MAP: Dict[str, str] = {
+        "books_database":         "run_query",            # bookreview_db
+        "business_database":      "run_query_googlelocal",
+        "clinical_database":      "run_query_pancancer",
+        "CPCDefinition_database": "run_query_patents",
+        "support_database":       "run_query_crm_support",
+    }
+
     def _build_tool_call(self, sq: SubQuery) -> tuple[str, Dict[str, Any]]:
         """Map a sub-query to the MCP tool and its parameters.
 
         PostgreSQL / SQLite / MongoDB → HTTP toolbox (team-dab-toolbox).
-        DuckDB → direct driver via MCPToolbox._call_duckdb (uses DUCKDB_PATH env).
+        DuckDB → HTTP custom DuckDB MCP service.
         """
         # Derive actual DB type from db_configs; fall back to query_type
         db_type = self._db_configs.get(sq.database, {}).get("type", sq.query_type).lower()
@@ -119,14 +370,17 @@ class ExecutionEngine:
             static_tool = self._match_static_pg_tool(sq.query)
             if static_tool:
                 return static_tool, {}
-            return "run_query", {"query": sq.query}
+            # Route to the per-database tool; fall back to run_query (bookreview default)
+            pg_tool = self._PG_TOOL_MAP.get(sq.database, "run_query")
+            return pg_tool, {"query": sq.query}
 
         if db_type == "sqlite":
-            return "sqlite_query", {"query": sq.query}
+            sqlite_tool = self._db_configs.get(sq.database, {}).get("mcp_tool", "sqlite_query")
+            return sqlite_tool, {"sql": sq.query}
 
         if db_type == "duckdb":
-            # MCPToolbox._call_duckdb uses the DUCKDB_PATH env var
-            return "duckdb_query", {"query": sq.query}
+            duckdb_tool = self._db_configs.get(sq.database, {}).get("mcp_tool", "duckdb_query")
+            return duckdb_tool, {"sql": sq.query}
 
         if db_type == "mongodb":
             collection, pipeline = self._parse_mongo_query(sq.query)
@@ -168,8 +422,48 @@ class ExecutionEngine:
         return None
 
     def _parse_mongo_query(self, query: str) -> tuple[str, str]:
-        """Extract a coarse collection hint and pipeline payload."""
-        collection = "checkin" if "checkin" in query.lower() else "business"
+        """Extract collection hint and valid JSON pipeline from a MongoDB query string.
+
+        The query string is what the LLM generated — typically a JSON aggregation
+        pipeline ``[{...}, ...]`` or a find-filter ``{...}``.  The previous
+        implementation always returned ``"{}"`` (empty filter), so every MongoDB
+        call returned unfiltered data.  We now pass the actual query through.
+        """
+        import json
+        import re
+
+        q_lower = query.lower()
+
+        # Detect the target collection from keywords.  Prefer explicit names;
+        # fall back to "business" for anything else (most Yelp queries).
+        if "checkin" in q_lower:
+            collection = "checkin"
+        else:
+            collection = "business"
+
+        stripped = query.strip()
+
+        # Fast path: the entire string is valid JSON — use it as-is.
+        try:
+            json.loads(stripped)
+            return collection, stripped
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Slow path: the LLM may have wrapped the JSON in prose or code fences.
+        # Extract the outermost JSON array or object.
+        json_match = re.search(r'(\[[\s\S]*\]|\{[\s\S]*\})', stripped)
+        if json_match:
+            candidate = json_match.group(1)
+            try:
+                json.loads(candidate)
+                return collection, candidate
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Final fallback: empty filter (returns all documents).  This is the
+        # pre-existing behaviour — better than crashing, but the LLM output
+        # should almost always be parseable JSON.
         return collection, "{}"
 
     def _merge_by_db(

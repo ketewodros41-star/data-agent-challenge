@@ -11,6 +11,30 @@ sources:
     kind: mongodb
     uri: mongodb://team-dab-mongo:27017
 
+  sqlite_bookreview:
+    kind: sqlite
+    database: /datasets/query_bookreview/query_dataset/review_query.db
+
+  sqlite_googlelocal:
+    kind: sqlite
+    database: /datasets/query_googlelocal/query_dataset/review_query.db
+
+  sqlite_agnews:
+    kind: sqlite
+    database: /datasets/query_agnews/query_dataset/metadata.db
+
+  sqlite_crm_core:
+    kind: sqlite
+    database: /datasets/query_crmarenapro/query_dataset/core_crm.db
+
+  sqlite_crm_products:
+    kind: sqlite
+    database: /datasets/query_crmarenapro/query_dataset/products_orders.db
+
+  sqlite_crm_territory:
+    kind: sqlite
+    database: /datasets/query_crmarenapro/query_dataset/territory.db
+
 tools:
   list_tables:
     kind: postgres-sql
@@ -61,14 +85,39 @@ tools:
     description: Find documents in the Yelp checkin collection.
 
   run_query:
-    kind: postgres-sql
+    kind: postgres-execute-sql
     source: postgres_main
     description: Execute an arbitrary SQL query against the PostgreSQL database.
-    parameters:
-      - name: query
-        type: string
-        description: SQL statement to execute
-    statement: "{{ params.query }}"
+
+  sqlite_bookreview_query:
+    kind: sqlite-execute-sql
+    source: sqlite_bookreview
+    description: Execute SQL against the BookReview SQLite review database.
+
+  sqlite_googlelocal_query:
+    kind: sqlite-execute-sql
+    source: sqlite_googlelocal
+    description: Execute SQL against the GoogleLocal SQLite review database.
+
+  sqlite_agnews_query:
+    kind: sqlite-execute-sql
+    source: sqlite_agnews
+    description: Execute SQL against the AG News SQLite metadata database.
+
+  sqlite_crm_core_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_core
+    description: Execute SQL against the CRM Arena Pro core SQLite database.
+
+  sqlite_crm_products_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_products
+    description: Execute SQL against the CRM Arena Pro products/orders SQLite database.
+
+  sqlite_crm_territory_query:
+    kind: sqlite-execute-sql
+    source: sqlite_crm_territory
+    description: Execute SQL against the CRM Arena Pro territory SQLite database.
 
 toolsets:
   oracle_forge:
@@ -79,3 +128,9 @@ toolsets:
       - find_yelp_businesses
       - find_yelp_checkins
       - run_query
+      - sqlite_bookreview_query
+      - sqlite_googlelocal_query
+      - sqlite_agnews_query
+      - sqlite_crm_core_query
+      - sqlite_crm_products_query
+      - sqlite_crm_territory_query

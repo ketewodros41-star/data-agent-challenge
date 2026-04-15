@@ -1,16 +1,16 @@
 """
-MCP Toolbox hybrid client.
+MCP hybrid client.
 
 Routes database calls:
 - PostgreSQL, MongoDB, SQLite -> HTTP to Google MCP Toolbox binary
-- DuckDB -> direct duckdb Python driver
+- DuckDB -> HTTP to the local DuckDB MCP service
 """
 
 from __future__ import annotations
 
 import json
-import os
 import itertools
+import os
 import time
 import urllib.error
 import urllib.request
@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover - optional dependency
 load_dotenv()
 
 TOOLBOX_URL = os.getenv("MCP_TOOLBOX_URL", os.getenv("TOOLBOX_URL", "http://localhost:5000"))
-DUCKDB_PATH = os.getenv("DUCKDB_PATH", "./data/dataset.duckdb")
+DUCKDB_MCP_URL = os.getenv("DUCKDB_MCP_URL", "http://127.0.0.1:8001")
 
 HTTP_SOURCE_TYPES = {"postgres", "mongodb"}
 DUCKDB_SOURCE_TYPES = {"duckdb"}
@@ -48,22 +48,22 @@ class ToolResult:
 
 class MCPToolbox:
     """
-    Hybrid MCP client routing to HTTP toolbox or direct drivers.
+    Hybrid MCP client routing to the configured MCP backends.
 
     Routing:
-      postgres / mongodb  → HTTP Google MCP Toolbox (team-dab-toolbox)
-      sqlite              → direct sqlite3 Python driver
-      duckdb              → direct duckdb Python driver
+      postgres / mongodb / sqlite → HTTP Google MCP Toolbox (team-dab-toolbox)
+      duckdb                      → HTTP custom DuckDB MCP service
     """
 
     def __init__(
         self,
         toolbox_url: str = TOOLBOX_URL,
+        duckdb_mcp_url: str = DUCKDB_MCP_URL,
         db_configs: Optional[Dict[str, dict]] = None,
     ):
         self.toolbox_url = toolbox_url
+        self.duckdb_mcp_url = duckdb_mcp_url
         self._db_configs: Dict[str, dict] = db_configs or {}
-        self._duckdb_conn = None
         self._request_ids = itertools.count(1)
         self._tool_source_map: Dict[str, str] = {}
         self._default_source_map = {
@@ -74,18 +74,34 @@ class MCPToolbox:
             "find_yelp_businesses": "mongodb",
             "find_yelp_checkins": "mongodb",
             "sqlite_query": "sqlite",
+            "sqlite_bookreview_query": "sqlite",
+            "sqlite_googlelocal_query": "sqlite",
+            "sqlite_agnews_query": "sqlite",
+            "sqlite_crm_core_query": "sqlite",
+            "sqlite_crm_products_query": "sqlite",
+            "sqlite_crm_territory_query": "sqlite",
             "duckdb_query": "duckdb",
+            "duckdb_crm_activities_query": "duckdb",
+            "duckdb_crm_sales_pipeline_query": "duckdb",
+            "duckdb_deps_dev_v1_query": "duckdb",
+            "duckdb_github_repos_query": "duckdb",
+            "duckdb_music_brainz_query": "duckdb",
+            "duckdb_pancancer_query": "duckdb",
+            "duckdb_stockindex_query": "duckdb",
+            "duckdb_stockmarket_query": "duckdb",
+            "duckdb_yelp_query": "duckdb",
         }
 
     def call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
         """
         Invoke a named tool. Routes to HTTP toolbox or direct DuckDB driver.
         """
+        parameters = self._normalize_parameters(tool_name, parameters)
         source_type = self._resolve_source_type(tool_name)
         start = time.time()
 
         if source_type in DUCKDB_SOURCE_TYPES:
-            result = self._call_duckdb(parameters.get("query", ""))
+            result = self._call_duckdb_http(tool_name, parameters)
         else:
             result = self._call_http(tool_name, parameters)
 
@@ -108,12 +124,8 @@ class MCPToolbox:
             results["toolbox_error"] = str(exc)
 
         try:
-            import duckdb
-
-            conn = duckdb.connect(DUCKDB_PATH)
-            conn.execute("SELECT 1").fetchone()
-            conn.close()
-            results["duckdb"] = True
+            payload = self._post_mcp("tools/list", {}, base_url=self.duckdb_mcp_url)
+            results["duckdb"] = bool(payload.get("result", {}).get("tools"))
         except Exception as exc:
             results["duckdb"] = False
             results["duckdb_error"] = str(exc)
@@ -139,26 +151,86 @@ class MCPToolbox:
         """Send tool invocation to MCP Toolbox HTTP server."""
         url = f"{self.toolbox_url}/api/tool/{tool_name}/invoke"
         payload = json.dumps(parameters).encode("utf-8")
+
         req = urllib.request.Request(
             url,
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
+
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode())
+                raw = json.loads(resp.read().decode())
+
+                result = raw.get("result", raw)
+
+                # NORMALIZATION LAYER
+                normalized = self._normalize_mcp_content(result)
+
                 return ToolResult(
                     success=True,
-                    data=data.get("result", data),
+                    data=normalized,
                 )
+
         except urllib.error.HTTPError as exc:
             body = exc.read().decode() if exc.fp else str(exc)
             return ToolResult(success=False, data=None, error=f"HTTP {exc.code}: {body}")
         except Exception as exc:
             return ToolResult(success=False, data=None, error=str(exc))
 
-    def _post_mcp(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
+
+    def _normalize_mcp_content(self, result: Any) -> List[Any]:
+        """
+        Convert MCP 'text' responses containing stringified JSON into structured Python objects.
+
+        Guards against non-dict results (e.g. plain error strings returned by the toolbox
+        in the result field) so the real error message is preserved rather than producing
+        a misleading "'str' object has no attribute 'get'" AttributeError.
+        """
+        if not isinstance(result, dict):
+            # Toolbox returned a list, plain string (error) or unexpected type.
+            # Lists are returned as-is; others are wrapped for caller convenience.
+            if isinstance(result, list):
+                return result
+            return [result] if result is not None else []
+
+        content = result.get("content", [])
+
+        normalized_rows = []
+
+        for item in content:
+            if not isinstance(item, dict):
+                normalized_rows.append(item)
+                continue
+
+            if item.get("type") == "text":
+                text = item.get("text", "")
+
+                try:
+                    parsed = json.loads(text)
+                    # The toolbox sometimes double-encodes: json.loads gives a string
+                    # that is itself a JSON-encoded list/dict.  Decode a second time.
+                    if isinstance(parsed, str):
+                        try:
+                            parsed = json.loads(parsed)
+                        except json.JSONDecodeError:
+                            pass
+                    if isinstance(parsed, list):
+                        normalized_rows.extend(parsed)
+                    else:
+                        normalized_rows.append(parsed)
+                except json.JSONDecodeError:
+                    # fallback: keep raw text
+                    normalized_rows.append(text)
+
+            else:
+                # already structured (e.g., future JSON types)
+                normalized_rows.append(item)
+
+        return normalized_rows
+
+    def _post_mcp(self, method: str, params: Dict[str, Any], base_url: Optional[str] = None) -> Dict[str, Any]:
         """Send a JSON-RPC request to the toolbox MCP HTTP endpoint."""
         payload = json.dumps(
             {
@@ -169,7 +241,7 @@ class MCPToolbox:
             }
         ).encode("utf-8")
         req = urllib.request.Request(
-            f"{self.toolbox_url}/mcp",
+            f"{(base_url or self.toolbox_url).rstrip('/')}/mcp",
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -177,17 +249,23 @@ class MCPToolbox:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read().decode())
 
-    def _call_duckdb(self, query: str) -> ToolResult:
-        """Execute SQL directly against DuckDB."""
+    def _call_duckdb_http(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
+        """Send DuckDB tool invocation to the local DuckDB MCP service."""
         try:
-            import duckdb
-
-            conn = duckdb.connect(DUCKDB_PATH, read_only=True)
-            rows = conn.execute(query).fetchall()
-            cols = [d[0] for d in conn.description] if conn.description else []
-            conn.close()
-            result_dicts = [dict(zip(cols, row)) for row in rows]
-            return ToolResult(success=True, data=result_dicts)
+            url = f"{self.duckdb_mcp_url.rstrip('/')}/api/tool/{tool_name}/invoke"
+            payload = json.dumps(parameters).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode())
+                return ToolResult(success=True, data=data.get("result", data))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode() if exc.fp else str(exc)
+            return ToolResult(success=False, data=None, error=f"HTTP {exc.code}: {body}")
         except Exception as exc:
             return ToolResult(success=False, data=None, error=str(exc))
 
@@ -196,3 +274,16 @@ class MCPToolbox:
         if tool_name in self._tool_source_map:
             return self._tool_source_map[tool_name]
         return self._default_source_map.get(tool_name, "postgres")
+
+    @staticmethod
+    def _normalize_parameters(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize legacy parameter names for toolbox tool kinds."""
+        normalized = dict(parameters)
+        if tool_name in {"run_query", "postgres-sql", "postgres-execute-sql"}:
+            if "sql" not in normalized and "query" in normalized:
+                normalized["sql"] = normalized.pop("query")
+        if tool_name.startswith("sqlite") and "sql" not in normalized and "query" in normalized:
+            normalized["sql"] = normalized.pop("query")
+        if tool_name.startswith("duckdb") and "sql" not in normalized and "query" in normalized:
+            normalized["sql"] = normalized.pop("query")
+        return normalized

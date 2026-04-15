@@ -75,6 +75,52 @@ _EXTRACTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── Known join-key format mismatches (kb/domain/dataset_overview.md) ──────────
+# Applied proactively on every matching query before the first execution attempt.
+# trigger  — regex that must match somewhere in the SQL text
+# hint     — plain-English correction description passed to the LLM rewriter
+_KNOWN_JOIN_FIXES: list[dict] = [
+    {
+        # Yelp: MongoDB business_id uses 'businessid_N'; DuckDB business_ref uses
+        # 'businessref_N'.  Strip the text prefix and compare integer suffixes.
+        "trigger": re.compile(r"\bbusiness(?:_id|_ref)\b", re.IGNORECASE),
+        "hint": (
+            "yelp join key mismatch: business_id (MongoDB) format is 'businessid_N'; "
+            "business_ref (DuckDB) format is 'businessref_N'. "
+            "Strip the text prefix and cast to integer to compare only the numeric suffix: "
+            "e.g. CAST(REGEXP_REPLACE(business_id, '[^0-9]', '', 'g') AS INTEGER). "
+            "Apply this normalisation to whichever column is present in this query."
+        ),
+    },
+    {
+        # Salesforce: ~25 % of Id-like fields carry a leading '#' character.
+        # Trigger on Salesforce-specific FK column names.
+        "trigger": re.compile(
+            r"\b(?:AccountId|ContactId|OpportunityId|OwnerId|LeadId|CaseId)\b",
+            re.IGNORECASE,
+        ),
+        "hint": (
+            "salesforce Id fields: approximately 25 % of Id-like values carry a "
+            "leading '#' character (e.g. '#001Wt00000PFj4z' instead of "
+            "'001Wt00000PFj4z'). Strip '#' before joining: "
+            "REPLACE(col, '#', '') or LTRIM(col, '#')."
+        ),
+    },
+    {
+        # TCGA / genomics: Patient_description contains the barcode as free text;
+        # ParticipantBarcode is the structured FK in molecular tables.
+        "trigger": re.compile(
+            r"\bPatient_description\b|\bParticipantBarcode\b", re.IGNORECASE
+        ),
+        "hint": (
+            "genomics join key: Patient_description (clinical_info) contains the "
+            "patient barcode/UUID as embedded free text. Extract the barcode with "
+            "a regex or LIKE pattern before joining to ParticipantBarcode in "
+            "molecular tables."
+        ),
+    },
+]
+
 
 class SelfCorrectionLoop:
     """
@@ -82,17 +128,45 @@ class SelfCorrectionLoop:
     failure classification, diagnosis, and targeted correction.
 
     Returns dict with keys: results, correction_applied, retries_used, success.
+
+    Can also be used as a base class: subclass and override ``handle_failure``
+    to plug a custom retry policy into the typed ExecutionEngine.
     """
 
     def __init__(
         self,
-        execution_engine: "ExecutionEngine",
-        context_manager: "ContextManager",
+        execution_engine: Optional["ExecutionEngine"] = None,
+        context_manager: Optional["ContextManager"] = None,
         client: Optional[LLMClient] = None,
     ):
         self._engine = execution_engine
         self._ctx = context_manager
         self._client = client or LLMClient()
+
+    # ── Typed scaffold hook ───────────────────────────────────────────────────
+
+    def handle_failure(
+        self,
+        plan: Any,
+        failure: Any,
+    ) -> Any:
+        """
+        Default retry policy used by the typed ExecutionEngine scaffold.
+
+        Subclass this method to implement custom correction logic.
+        The default implementation always retries (the engine enforces
+        ``plan.max_retries`` as the hard upper bound).
+
+        Args:
+            plan:    The current ``ExecutionPlan`` (from ``agent.types``).
+            failure: A ``FailureRecord`` describing the failed step.
+
+        Returns:
+            A ``CorrectionDecision`` indicating whether to retry and an
+            optional repaired plan.
+        """
+        from agent.types import CorrectionDecision
+        return CorrectionDecision(retryable=True, reason="retry", updated_plan=None)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -122,9 +196,8 @@ class SelfCorrectionLoop:
             plan, question
         )
 
-        print(f"[SelfCorrection] current_plan={current_plan!r}")
-        print(f"[SelfCorrection] current_plan_type={type(current_plan)}")
         results: List[QueryResult] = []
+        null_patch_applied = False  # only patch null-metric queries once
         assert current_plan is not None, "SelfCorrectionLoop received a None plan"
         for attempt in range(MAX_RETRIES):
             results = self._engine.execute_plan(
@@ -134,6 +207,19 @@ class SelfCorrectionLoop:
             failures = [r for r in results if not r.success]
 
             if not failures:
+                # Semantic null-metric check: ORDER BY col returns all NULLs in
+                # PostgreSQL because NULLs sort first in DESC order.  Retry once
+                # with WHERE col IS NOT NULL injected.
+                if not null_patch_applied and attempt < MAX_RETRIES - 1:
+                    null_patched_plan, was_null_patched = self._patch_null_metric_queries(
+                        current_plan, results
+                    )
+                    if was_null_patched:
+                        current_plan = null_patched_plan
+                        correction_applied = True
+                        null_patch_applied = True
+                        continue  # Re-run with null filter
+
                 # Log verified outcome for any corrections applied on this attempt
                 if correction_applied and attempt > 0:
                     for sq in current_plan.sub_queries:
@@ -151,6 +237,7 @@ class SelfCorrectionLoop:
                     "correction_applied": correction_applied,
                     "retries_used": attempt,
                     "success": True,
+                    "final_plan": current_plan,
                 }
 
             if attempt == MAX_RETRIES - 1:
@@ -168,6 +255,7 @@ class SelfCorrectionLoop:
             "correction_applied": correction_applied,
             "retries_used": MAX_RETRIES - 1,
             "success": False,
+            "final_plan": current_plan,
         }
 
     # ── 8.1  Failure detection ────────────────────────────────────────────────
@@ -315,23 +403,89 @@ class SelfCorrectionLoop:
 
     # ── 8.4  Retry orchestration ──────────────────────────────────────────────
 
+    def _apply_known_join_key_normalizations(
+        self,
+        plan: QueryPlan,
+    ) -> tuple[QueryPlan, bool]:
+        """
+        Layer 2 proactive pass: rewrite sub-queries that reference columns with
+        documented format mismatches (see _KNOWN_JOIN_FIXES / dataset_overview.md).
+
+        Fires on the very first execution attempt regardless of whether Layer 3
+        has a matching past failure, so the agent never pays the cost of a failed
+        round-trip on well-known join-key problems.
+
+        Uses the LLM rewriter with a targeted hint rather than fragile regex
+        surgery, keeping the corrected SQL semantically valid.
+        """
+        corrected_sqs = list(plan.sub_queries)
+        any_corrected = False
+
+        for idx, sq in enumerate(plan.sub_queries):
+            applicable = [
+                fix for fix in _KNOWN_JOIN_FIXES
+                if fix["trigger"].search(sq.query)
+            ]
+            if not applicable:
+                continue
+
+            combined_hint = " | ".join(fix["hint"] for fix in applicable)
+            corrected = self._llm_regenerate_query(
+                question="(proactive join-key normalisation)",
+                query=sq.query,
+                error="(no error — proactive normalisation before first attempt)",
+                db_name=sq.database,
+                hint=combined_hint,
+            )
+            if corrected and corrected != sq.query:
+                corrected_sqs[idx] = SubQuery(
+                    database=sq.database,
+                    query=corrected,
+                    query_type=sq.query_type,
+                    dependencies=sq.dependencies,
+                    description=sq.description + " [proactive-jk-norm]",
+                )
+                any_corrected = True
+
+        if not any_corrected:
+            return plan, False
+
+        return (
+            QueryPlan(
+                sub_queries=corrected_sqs,
+                execution_order=plan.execution_order,
+                join_operations=plan.join_operations,
+                requires_sandbox=plan.requires_sandbox,
+                rationale=plan.rationale + " [proactive-jk-norm]",
+            ),
+            True,
+        )
+
     def _apply_proactive_corrections(
         self,
         plan: QueryPlan,
         question: str,
     ) -> tuple[QueryPlan, bool]:
         """
-        Self-learning loop: before the first execution attempt, check Layer 3
-        for similar past failures and apply the known fix proactively.
+        Self-learning loop: before the first execution attempt apply two passes.
 
-        Searches by the NL question (stable across iterations at temperature=0)
-        and uses the stored corrected query directly — no extra LLM round-trip
-        needed because the correction field already holds the full corrected SQL.
-        On the second run correction_applied=True is set in the trace without
-        ever hitting the failure again.
+        Pass 1 — Layer 2 known join-key normalization:
+          Checks each sub-query against _KNOWN_JOIN_FIXES (patterns documented
+          in kb/domain/dataset_overview.md) and rewrites via LLM when a
+          risky pattern is detected, even if Layer 3 has no past failure yet.
+
+        Pass 2 — Layer 3 past-failure application:
+          Searches by the NL question (stable across iterations at temperature=0)
+          and uses the stored corrected query directly — no extra LLM round-trip
+          needed because the correction field already holds the full corrected SQL.
+          On the second run correction_applied=True is set in the trace without
+          ever hitting the failure again.
         """
+        # Pass 1: proactive Layer 2 join-key normalization
+        plan, jk_corrected = self._apply_known_join_key_normalizations(plan)
+
         corrected_sub_queries = list(plan.sub_queries)
-        any_corrected = False
+        any_corrected = jk_corrected
 
         for idx, sq in enumerate(plan.sub_queries):
             try:
@@ -499,6 +653,115 @@ class SelfCorrectionLoop:
             corrections_made,
         )
 
+    # ── Null-metric semantic failure detection ────────────────────────────────
+
+    def _patch_null_metric_queries(
+        self,
+        plan: QueryPlan,
+        results: List[QueryResult],
+    ) -> tuple[QueryPlan, bool]:
+        """
+        Detect queries where ORDER BY column returns all-NULL values and inject
+        a WHERE col IS NOT NULL filter so NULLs are skipped.
+
+        PostgreSQL (and most SQL engines) sort NULLs as greatest in DESC order,
+        so 'ORDER BY price DESC LIMIT 5' returns null-priced rows instead of
+        the highest-priced ones when many rows have null prices.
+        """
+        results_by_db = {r.database: r for r in results if r.success}
+        patched_sqs = list(plan.sub_queries)
+        any_patched = False
+
+        for idx, sq in enumerate(plan.sub_queries):
+            result = results_by_db.get(sq.database)
+            if result is None:
+                continue
+
+            col = self._extract_orderby_col(sq.query)
+            if col is None:
+                continue
+
+            data = result.data
+            # Flatten single-element list wrappers that survive normalization
+            if isinstance(data, list) and len(data) == 1:
+                inner = data[0]
+                if isinstance(inner, list):
+                    data = inner
+                elif isinstance(inner, str):
+                    try:
+                        import json as _json
+                        data = _json.loads(inner)
+                    except Exception:
+                        pass
+
+            if not self._all_null_in_col(data, col):
+                continue
+
+            patched_query = self._inject_null_filter(sq.query, col)
+            if patched_query and patched_query != sq.query:
+                print(
+                    f"[SelfCorrection] Null-metric patch: '{col}' all-null "
+                    f"in {sq.database}, retrying with WHERE {col} IS NOT NULL"
+                )
+                patched_sqs[idx] = SubQuery(
+                    database=sq.database,
+                    query=patched_query,
+                    query_type=sq.query_type,
+                    dependencies=sq.dependencies,
+                    description=sq.description + f" [null-filter:{col}]",
+                )
+                any_patched = True
+
+        if not any_patched:
+            return plan, False
+
+        return (
+            QueryPlan(
+                sub_queries=patched_sqs,
+                execution_order=plan.execution_order,
+                join_operations=plan.join_operations,
+                requires_sandbox=plan.requires_sandbox,
+                rationale=plan.rationale + " [null-metric-patch]",
+            ),
+            True,
+        )
+
+    @staticmethod
+    def _extract_orderby_col(query: str) -> Optional[str]:
+        """Return the first column name from ORDER BY, or None if absent."""
+        m = re.search(r'\bORDER\s+BY\s+(\w+)', query, re.IGNORECASE)
+        return m.group(1) if m else None
+
+    @staticmethod
+    def _all_null_in_col(data: Any, col: str) -> bool:
+        """Return True when every row in data has None/null for col."""
+        if not isinstance(data, list) or len(data) == 0:
+            return False
+        rows = [r for r in data if isinstance(r, dict)]
+        if not rows:
+            return False
+        return all(row.get(col) is None for row in rows)
+
+    @staticmethod
+    def _inject_null_filter(query: str, col: str) -> str:
+        """Insert 'WHERE col IS NOT NULL' (or AND variant) before ORDER BY."""
+        null_cond = f"{col} IS NOT NULL"
+        if re.search(r'\bWHERE\b', query, re.IGNORECASE):
+            return re.sub(
+                r'(\bORDER\s+BY\b)',
+                f'AND {null_cond} \\1',
+                query,
+                flags=re.IGNORECASE,
+                count=1,
+            )
+        return re.sub(
+            r'(\bORDER\s+BY\b)',
+            f'WHERE {null_cond} \\1',
+            query,
+            flags=re.IGNORECASE,
+            count=1,
+        )
+
     # ── Classification helpers ────────────────────────────────────────────────
 
     def _classify_error(self, error: str) -> str:
@@ -645,6 +908,57 @@ class SelfCorrectionLoop:
 
     # ── LLM helpers ───────────────────────────────────────────────────────────
 
+    def _schema_hint_for_db(self, db_name: str) -> str:
+        """
+        Return a concise schema summary for db_name to ground the LLM during
+        query regeneration.
+
+        Priority:
+          1. Layer 1 live introspection — table names + column lists
+          2. Layer 2 KB docs — search institutional_knowledge for a section
+             that mentions db_name (e.g. the bookreview section in schema.md)
+
+        Returns "" when neither source yields useful data.
+        """
+        # Layer 1: live schema introspection
+        try:
+            schema_map = self._ctx.get_schema_for_databases([db_name])
+            if db_name in schema_map:
+                si = schema_map[db_name]
+                if si.tables:
+                    lines = [f"Database: {db_name} ({si.db_type})"]
+                    for table, cols in si.tables.items():
+                        col_preview = ", ".join(cols[:20])
+                        lines.append(f"  Table: {table} — columns: {col_preview}")
+                    return "\n".join(lines)
+        except Exception:
+            pass
+
+        # Layer 2: KB docs — find the section that describes this database
+        try:
+            bundle = self._ctx.get_bundle()
+            for doc in bundle.institutional_knowledge:
+                content = doc.content
+                if db_name.lower() not in content.lower():
+                    continue
+                # Extract up to 25 lines starting from the first mention
+                lines = content.split("\n")
+                relevant: List[str] = []
+                capturing = False
+                for line in lines:
+                    if db_name.lower() in line.lower():
+                        capturing = True
+                    if capturing:
+                        relevant.append(line)
+                        if len(relevant) >= 25:
+                            break
+                if relevant:
+                    return f"From KB ({doc.source}):\n" + "\n".join(relevant)
+        except Exception:
+            pass
+
+        return ""
+
     def _llm_regenerate_query(
         self,
         question: str,
@@ -655,15 +969,20 @@ class SelfCorrectionLoop:
     ) -> Optional[str]:
         """
         Ask the LLM to rewrite a failed query given the error and an optional hint.
-        Returns the corrected query string, or None on failure.
+
+        Injects Layer 1/2 schema context so the LLM uses the correct table and
+        column names instead of guessing.  Returns the corrected query string,
+        or None on failure.
         """
         hint_section = f"\nHint: {hint}" if hint else ""
+        schema_hint = self._schema_hint_for_db(db_name)
+        schema_section = f"\nSchema context:\n{schema_hint}" if schema_hint else ""
         prompt = (
             "A database query failed. Produce a corrected query.\n\n"
             f"Original question: {question}\n"
             f"Database: {db_name}\n"
             f"Failed query:\n{query}\n\n"
-            f"Error message:\n{error}{hint_section}\n\n"
+            f"Error message:\n{error}{hint_section}{schema_section}\n\n"
             "Return only the corrected query string (no explanation, no markdown)."
         )
         try:

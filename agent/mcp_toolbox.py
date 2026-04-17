@@ -188,53 +188,42 @@ class MCPToolbox:
 
     def _normalize_mcp_content(self, result: Any) -> List[Any]:
         """
-        Convert MCP 'text' responses containing stringified JSON into structured Python objects.
-
-        Guards against non-dict results (e.g. plain error strings returned by the toolbox
-        in the result field) so the real error message is preserved rather than producing
-        a misleading "'str' object has no attribute 'get'" AttributeError.
+        Convert MCP responses (which often triple-encode JSON in strings) into flat lists of dictionaries.
         """
-        if not isinstance(result, dict):
-            # Toolbox returned a list, plain string (error) or unexpected type.
-            # Lists are returned as-is; others are wrapped for caller convenience.
-            if isinstance(result, list):
-                return result
-            return [result] if result is not None else []
-
-        content = result.get("content", [])
-
-        normalized_rows = []
-
-        for item in content:
-            if not isinstance(item, dict):
-                normalized_rows.append(item)
-                continue
-
-            if item.get("type") == "text":
-                text = item.get("text", "")
-
-                try:
-                    parsed = json.loads(text)
-                    # The toolbox sometimes double-encodes: json.loads gives a string
-                    # that is itself a JSON-encoded list/dict.  Decode a second time.
-                    if isinstance(parsed, str):
-                        try:
-                            parsed = json.loads(parsed)
-                        except json.JSONDecodeError:
-                            pass
-                    if isinstance(parsed, list):
-                        normalized_rows.extend(parsed)
+        if result is None:
+            return []
+            
+        def _deep_unpack(val: Any) -> Any:
+            if isinstance(val, str):
+                stripped = val.strip()
+                if (stripped.startswith('[') and stripped.endswith(']')) or (stripped.startswith('{') and stripped.endswith('}')):
+                    try:
+                        parsed = json.loads(val)
+                        return _deep_unpack(parsed)
+                    except json.JSONDecodeError:
+                        return val
+                return val
+            if isinstance(val, list):
+                unpacked = []
+                for item in val:
+                    res = _deep_unpack(item)
+                    if isinstance(res, list):
+                        unpacked.extend(res)
                     else:
-                        normalized_rows.append(parsed)
-                except json.JSONDecodeError:
-                    # fallback: keep raw text
-                    normalized_rows.append(text)
+                        unpacked.append(res)
+                return unpacked
+            if isinstance(val, dict):
+                # If it's an MCP 'content' dict, look inside 'text'
+                if val.get("type") == "text" and "text" in val:
+                    return _deep_unpack(val["text"])
+                # If it's a JSON-RPC 'result' dict, look inside 'content'
+                if "content" in val:
+                    return _deep_unpack(val["content"])
+                return {k: _deep_unpack(v) for k, v in val.items()}
+            return val
 
-            else:
-                # already structured (e.g., future JSON types)
-                normalized_rows.append(item)
-
-        return normalized_rows
+        unpacked = _deep_unpack(result)
+        return unpacked if isinstance(unpacked, list) else [unpacked]
 
     def _post_mcp(self, method: str, params: Dict[str, Any], base_url: Optional[str] = None) -> Dict[str, Any]:
         """Send a JSON-RPC request to the toolbox MCP HTTP endpoint."""
@@ -268,7 +257,9 @@ class MCPToolbox:
             )
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode())
-                return ToolResult(success=True, data=data.get("result", data))
+                result = data.get("result", data)
+                normalized = self._normalize_mcp_content(result)
+                return ToolResult(success=True, data=normalized)
         except urllib.error.HTTPError as exc:
             body = exc.read().decode() if exc.fp else str(exc)
             return ToolResult(success=False, data=None, error=f"HTTP {exc.code}: {body}")
@@ -305,10 +296,15 @@ class MCPToolbox:
         try:
             with MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000) as client:
                 collection = client[MONGO_DB_NAME][collection_name]
-                documents = list(collection.find(query_filter).limit(limit_value))
+                if isinstance(query_filter, list):
+                    # Aggregation pipeline
+                    documents = list(collection.aggregate(query_filter))
+                else:
+                    # Simple find query
+                    documents = list(collection.find(query_filter).limit(limit_value))
             return ToolResult(success=True, data=[self._sanitize_mongo_document(doc) for doc in documents])
         except Exception as exc:
-            return ToolResult(success=False, data=None, error=str(exc))
+            return ToolResult(success=False, data=None, error=f"MongoDB Error: {exc}")
 
     @staticmethod
     def _sanitize_mongo_document(value: Any) -> Any:

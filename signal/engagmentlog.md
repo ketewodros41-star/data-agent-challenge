@@ -1,6 +1,7 @@
 # Signal Corps Engagement Log
 ## PaLM Team — TRP1 FDE Programme, April 2026
 ## Members: Kidus Tewodros & Mistire Daniel
+## Last Updated: Friday April 18, 2026
 
 ---
 
@@ -43,16 +44,16 @@ https://medium.com/@ktewodros41/were-building-a-data-agent-that-competes-on-a-uc
 
 **Day 3 Full Posts — Mistire (2:12 AM & 4:38 AM):**
 
-> OpenAI shared how they built an internal AI data agent
-that turns plain English questions into reliable data
-insights. Instead of just generating answers, it finds
-the right data, runs queries, checks itself, and
-explains results. Worth a read:
+> OpenAI shared how they built an internal AI data
+agent that turns plain English questions into reliable
+data insights. Instead of just generating answers,
+it finds the right data, runs queries, checks itself,
+and explains results. Worth a read:
 https://openai.com/index/inside-our-in-house-data-agent
 
 > This is a good breakdown of Karpathy's idea of LLM
-knowledge bases. Instead of RAG pipelines, the idea is
-to have the LLM compile raw data into a structured,
+knowledge bases. Instead of RAG pipelines, the idea
+is to have the LLM compile raw data into a structured,
 evolving wiki that it can reason over. Feels very
 relevant to what we're building around knowledge bases.
 https://academy.dair.ai/blog/llm-knowledge-bases-karpathy
@@ -148,7 +149,6 @@ https://docs.google.com/document/d/1kM8pYl7KpfBVWHSjqRCRpH9pQremogIkYfLzDrkXUtU/
 via Memory Discipline — Index-Pointer Separation,
 MEMORY.md architecture, self-healing memory pattern
 - **Notable responses:** None captured
-- **Reach metrics:** 31 views
 
 ---
 
@@ -219,37 +219,43 @@ optimisation challenge, DAB benchmark submission
 - **URL:** https://x.com/Kidus5T99409/status/2043065456173387782
 - **Views:** 49
 - **Topic:** Applying Karpathy's 4-phase LLM KB
-method (ingest → compile → query → maintain)
-to a production data agent. Corrections log
+method to a production data agent. Corrections log
 outperforming static domain knowledge.
 - **Key tweets:**
   - KB treated as compiled wiki not RAG pipeline
   - 4-phase pipeline maps to data agent needs
-  - Corrections log: `[query failed] → [why] →
-  [correct approach]` read at session start
   - Corrections log outperformed static Layer 2
-  - Bottleneck is context quality not model
-  capability
-- **Notable responses:** TBC
+  - Bottleneck is context quality not model capability
+- **Notable responses:** None captured
 
 ---
 
 #### Thread 5 — a16z Context Layer Post Response
 - **Date:** April 13, 2026
-- **URL:** https://x.com/Kidus5T99409/status/
-[paste full URL]
-- **Views:** 17
+- **URL:** https://x.com/Kidus5T99409/status/2043837626114027593
+- **Views:** 32
 - **Topic:** Responding to a16z piece on why data
 agents fail without context layers. Matching their
 5-step framework against our 3-layer architecture.
-- **Key tweets:**
-  - Context problem not model problem — confirmed
-  - a16z 5-step vs our 3-layer synthesis
-  - Self-updating corrections log outperforming
-  everything else built
-  - Human refinement as the unsolved
-  sociotechnical problem
-- **Notable responses:** TBC
+Self-updating corrections log outperforming
+everything else built. Human refinement as the
+unsolved sociotechnical problem.
+- **Notable responses:** None captured
+
+---
+
+#### Thread 6 — Embedded Structured Data Discovery
+- **Date:** April 14, 2026
+- **URL:** https://x.com/Kidus5T99409/status/2044165219908210861
+- **Views:** 21
+- **Topic:** Discovery that some DAB datasets have
+no dedicated columns for structured data. Location,
+category, and status indicators embedded inside
+free-text description fields. Must extract structured
+fact from text before any calculation. KB Layer 2
+documents which fields have embedded data. DAB hint
+files confirmed the pattern.
+- **Notable responses:** None captured
 
 ---
 
@@ -262,14 +268,14 @@ agents fail without context layers. Matching their
 - **Post title:** "help Curious if anyone here has
 tackled multi-database schema loading strategies"
 - **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1shx8ag/help_curious_if_anyone_here_has_tackled/
-- **Views:** 867
-- **Upvotes:** 1
+- **Views:** 1,300+
+- **Upvotes:** 2
 - **Summary of post:**
   Asked the community about multi-database schema
   loading strategies — whether to load full schemas
-  upfront or retrieve on demand. Shared our DAB
-  context: 4 database systems, 54.3% leaderboard
-  ceiling, Claude Code + OpenAI architecture synthesis,
+  upfront or retrieve on demand. Shared DAB context:
+  4 database systems, 54.3% leaderboard ceiling,
+  Claude Code + OpenAI architecture synthesis,
   token optimisation challenge.
 - **Responses received:**
 
@@ -277,15 +283,26 @@ tackled multi-database schema loading strategies"
   > Schema summaries + on-demand expansion: start
   with table-level stats and exemplar columns, pull
   full column lists only for candidate tables after
-  first-pass query plan.
+  first-pass query plan. Log join-key failures into
+  compact fixup memory.
 
   **u/Sufficient_Might_228:**
   > Lazy loading per sub-query works better — loading
-  full schemas upfront creates context bloat.
+  full schemas upfront creates context bloat. Start
+  with table names only, fetch column details for
+  tables the LLM actually selects.
 
   **u/Foreign_Skill_6628:**
   > Schema-as-a-Database approach: load schemas into
   DuckDB or Neo4j, use semantic search via MCP server.
+  Load as a Claude skill — activates only when invoked.
+
+  **u/Nidhhiii18:**
+  > On-demand retrieval per sub-query is almost always
+  better. Cache a lightweight schema index — table
+  names, column names, types — pull detailed metadata
+  only when router picks a target DB. Keep rolling
+  window of last N failures for corrections log.
 
 - **Our replies:**
   - Acknowledged schema summaries + on-demand
@@ -300,44 +317,293 @@ tackled multi-database schema loading strategies"
 - **Platform:** r/learnmachinelearning
 - **Username:** u/Admirable_Salary_326
 - **Post title:** "Curious how others are handling
-the human refinement step at scale — specifically
-how you decide what tribal knowledge is worth
-capturing versus what should just be discovered
-by the corrections loop over time"
+the human refinement step at scale"
 - **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1skrzsh/curious_how_others_are_handling_the_human/
-- **Views:** 290
+- **Views:** 383
 - **Upvotes:** 1
 - **Summary of post:**
   Referenced a16z piece on data agent context layers.
-  Described three real failures hitting our team:
-  business definitions not in schema, semantically
-  wrong data sources, and context that decayed over
-  time. Described our 3-layer architecture and
-  corrections log approach. Asked community about
-  human refinement at scale — specifically what
-  tribal knowledge is worth capturing vs what the
-  corrections loop should discover.
+  Described three real failures: business definitions
+  not in schema, semantically wrong data sources,
+  context that decayed over time. Asked community
+  how to balance tribal knowledge capture vs
+  corrections loop discovery.
 - **Key insight shared:**
   > "For a benchmark this is solvable — the tribal
   knowledge is in the DAB paper and dataset
   documentation. For a real enterprise deployment
   it is not. The context layer is a sociotechnical
   problem, not just a technical one."
-- **Responses received:** TBC — update after 24hrs
+- **Responses received:** None yet — monitoring
+- **Community intel extracted:** Sociotechnical
+  framing resonating — 383 views confirms practitioners
+  are reading
+
+---
+
+#### Entry 3 — Reddit r/AI_Agents
+- **Date:** April 11, 2026
+- **Platform:** r/AI_Agents
+- **Username:** u/ktewodros41
+- **Post title:** "Curious if anyone else has applied
+this to agentic systems — specifically how you handle
+the maintain phase when the KB grows faster than you
+can injection-test it"
+- **Direct link:** https://www.reddit.com/r/AI_Agents/comments/1sitlhf/curious_if_anyone_else_has_applied_this_to/
+- **Views:** 667
+- **Upvotes:** 2
+- **Summary of post:**
+  Applied Karpathy's 4-phase KB method to data agent.
+  Key finding: corrections log outperformed static
+  domain knowledge. Discussed removal over accumulation
+  discipline and injection test as quality gate.
+- **Responses received:**
+
+  **u/Sufficient_Dig207 (Reply 1):**
+  > "Thanks for sharing. Wonder how you hook this up
+  to a coding agent — is it replacing a skill? If not,
+  how do they complement each other?"
+
+  **u/Sufficient_Dig207 (Reply 2):**
+  > "And wonder whether this is helpful, instead of
+  uploading info, you just connect and query tools
+  to build the wiki."
+  Shared: github.com/ZhixiangLuo/10xProductivity
+
+- **Community intel extracted:**
+  How KB complements agent skills is a genuine
+  architectural question — flagged to Intelligence
+  Officers for KB v3 documentation. 10xProductivity
+  tool worth reviewing for maintain phase automation.
+
+---
+
+#### Entry 4 — Reddit r/learnmachinelearning
+- **Date:** April 14, 2026
+- **Platform:** r/learnmachinelearning
+- **Username:** u/Admirable_Salary_326
+- **Post title:** "Help We discovered that some
+enterprise datasets don't have dedicated columns
+for structured data — it's embedded inside
+description fields. How are others handling NLP
+extraction before aggregation in data agents?"
+- **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1sll6z2/help_we_discovered_that_some_enterprise_datasets/
+- **Views:** 250
+- **Upvotes:** 0
+- **Summary of post:**
+  Shared the discovery that some DAB datasets embed
+  location data, category information, and status
+  indicators inside free-text description fields
+  with no dedicated column. Asked community three
+  questions: extraction as pre-processing vs inside
+  query execution, how to handle extraction failures
+  or ambiguous results, whether there is a reliable
+  way to detect which fields need extraction without
+  manual inventory.
+- **Responses received:** None yet — monitoring
 - **Community intel extracted:** TBC
 
 ---
 
-### Community Intelligence Gathered This Week
+#### Entry 5 — Reddit r/aiagents
+- **Date:** April 14, 2026
+- **Platform:** r/aiagents
+- **Username:** u/Admirable_Salary_326
+- **Post title:** "Help We discovered that some
+enterprise datasets don't have dedicated columns
+for structured data — it's embedded inside
+description fields. How are others handling NLP
+extraction before aggregation in data agents?"
+- **Direct link:** https://www.reddit.com/r/aiagents/comments/1sll5ph/help_we_discovered_that_some_enterprise_datasets/
+- **Views:** 479
+- **Upvotes:** 2
+- **Summary of post:**
+  Same post cross-posted to r/aiagents for broader
+  reach in the agent-building community.
+- **Responses received:**
 
-| Date | Source | Intel | Impact on Team |
-|------|--------|-------|----------------|
-| Apr 9 | @fabiolauria92 — X | SME fragmented data is real production pain point — real-time consistency is core challenge | Confirms we are targeting the right problem |
-| Apr 9 | @rivestack — X | Schema normalisation vs native types per DB — active practitioner debate | Validates join key glossary approach — flagged to Estif and Melkam for KB v2 |
-| Apr 10 | u/Otherwise_Wave9374 — Reddit | Schema summaries + on-demand expansion | Proposed solution for token optimisation open question |
-| Apr 10 | u/Sufficient_Might_228 — Reddit | Lazy loading per sub-query | Validates lazy loading approach |
-| Apr 10 | u/Foreign_Skill_6628 — Reddit | Schema-as-a-Database via DuckDB/Neo4j + MCP | Novel approach for KB v2 |
-| Apr 13 | r/learnmachinelearning — Reddit | Community response to human refinement question pending | Will update after 24hrs |
+  **u/Inevitable_Raccoon_9:**
+  > "I didnt face such question with DB while coding
+  but I had same problems with lots of texts that
+  were unstructured too. Literally told OPUS the
+  problem and he just read the hundreds of texts
+  and analysed them — then told me 'I can write a
+  script that extracts all data like you need it.'
+  It was literally just grep against the data — and
+  a script is way faster than an AI. My advice —
+  just rewrite your text with a bit more explanation
+  and feed it into OPUS (when in intelligent mode)."
+
+  **Our reply:**
+  > "That is actually a really useful framing — and
+  the grep approach is underrated for fields where
+  the structure is consistent enough. If location
+  always appears in the same position or format,
+  a well-crafted script will outperform an LLM call
+  every time on speed and reliability.
+  >
+  > The challenge we are hitting is specifically the
+  inconsistent cases. Some of our DAB datasets have
+  description fields where the same type of
+  information appears in three or four different
+  formats across records — sometimes abbreviated,
+  sometimes spelled out, sometimes missing entirely.
+  Pattern matching works on the clean subset and
+  breaks on the rest. That is the part we are still
+  figuring out.
+  >
+  > What we are leaning toward is a tiered approach:
+  try pattern matching first, fall back to an LLM
+  extraction call only for records where the pattern
+  fails, and flag any record where extraction returns
+  ambiguous results rather than silently passing a
+  low-confidence answer downstream. The silent wrong
+  answer is the failure mode we are most worried
+  about — an extraction that looks correct but is
+  not will corrupt every aggregation that depends on it.
+  >
+  > The OPUS suggestion for designing the extraction
+  script is well taken though. We have been thinking
+  about this as a runtime problem but you are right
+  that a well-designed pre-processing script could
+  handle a significant chunk of it before the agent
+  ever runs. Worth testing whether a one-time
+  extraction pass over the known fields could be
+  committed to the KB as structured data rather than
+  requiring the agent to re-extract at query time.
+  >
+  > Thanks for sharing — the dry run mode detail is
+  a good practical tip."
+
+- **Community intel extracted:**
+  Tiered extraction approach validated — pattern
+  matching first, LLM fallback only for inconsistent
+  records. Pre-processing pass committed to KB as
+  structured data is worth testing. Dry run mode
+  for extraction scripts is a practical tip worth
+  implementing. Flagged to Intelligence Officers
+  for unstructured field inventory documentation.
+- **Impact on team:**
+  The reply forced the team to publicly commit to
+  the tiered extraction approach — pattern matching
+  first, LLM fallback, flag ambiguous results rather
+  than silently passing low-confidence answers. This
+  is now the confirmed extraction strategy documented
+  in the KB unstructured field inventory.
+
+---
+
+#### Entry 6 — Reddit r/learnmachinelearning
+- **Date:** April 15, 2026
+- **Platform:** r/learnmachinelearning
+- **Username:** u/Admirable_Salary_326
+- **Post title:** "question For teams that have run
+agents against real enterprise data, how do you
+distinguish between a data quality failure and a
+domain knowledge gap?"
+- **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/question_for_teams_that_have_run_agents_against/
+- **Views:** 123
+- **Upvotes:** 1
+- **Note:** Post was removed by Reddit's filters
+  after initial posting — still visible but limited
+  distribution
+- **Summary of post:**
+  Described five failure categories classified before
+  running the benchmark. Syntax — tool name resolution
+  HTTP 404. Data quality — null constraint violations.
+  Wrong DB type — PostgreSQL queries sent to SQLite
+  twice. Asked community how to distinguish data
+  quality failures from domain knowledge gaps.
+- **Responses received:**
+
+  **u/theShku:**
+  > "How are you handling your semantic layers?"
+  - Reply URL: https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/comment/ogej5xq/
+
+  **Our reply:**
+  > "We are not using a traditional semantic layer
+  in the BI sense — no LookML, no dbt metrics, no
+  centralised metric store. Instead we built an
+  institutional knowledge layer — three structured
+  markdown documents injected directly into the
+  agent's context before it answers any question.
+  Domain term definitions with dataset-specific
+  mappings. Dataset overview covering join strategies
+  and authoritative table designations. Corrections
+  log — append-only log of every failure structured
+  as query that failed, why it failed, correct
+  approach. The key difference: designed to be
+  injected into a context window, not queried.
+  No embeddings, no retrieval, no vector search.
+  Every document must pass an injection test before
+  it is committed."
+  - Our reply URL: https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/comment/ogenrwc/
+
+  **u/theShku counter-reply:**
+  > "We're following recommended OSI standards for
+  context grounding.
+  https://open-semantic-interchange.org/"
+
+- **Community intel extracted:**
+  OSI standards for context grounding surfaced as
+  a new framework worth reviewing for structuring
+  KB documents more formally in future sprints.
+  open-semantic-interchange.org flagged for
+  Intelligence Officers. The injection-first
+  articulation is now the canonical external
+  description of Layer 2.
+- **Impact on team:**
+  Forced precise commitment to how we describe
+  Layer 2 externally. OSI standard is new community
+  intelligence. The injection-first framing is now
+  the canonical description the team uses.
+
+---
+
+### Community Intelligence Gathered
+
+| Date | Source | Platform | Intel | Impact on Team |
+|------|--------|----------|-------|----------------|
+| Apr 9 | @fabiolauria92 | X | SME fragmented data is real production pain point — real-time consistency is core challenge | Confirms we are targeting the right problem — changed how Signal Corps framed all subsequent posts |
+| Apr 9 | @rivestack | X | Schema normalisation vs native types per DB — active practitioner debate | Validates join key glossary approach — Estif and Melkam built KB v2 glossary immediately after |
+| Apr 10 | u/Otherwise_Wave9374 | Reddit | Schema summaries + on-demand expansion — table stats first, full columns only for candidate tables | First of four practitioners converging on lazy loading — brought to mob session |
+| Apr 10 | u/Sufficient_Might_228 | Reddit | Lazy loading per sub-query — table names only, expand on selection | Second independent source confirming lazy loading |
+| Apr 10 | u/Foreign_Skill_6628 | Reddit | Schema-as-a-Database via DuckDB/Neo4j + MCP semantic search | Novel approach flagged to Intelligence Officers for KB v2 |
+| Apr 10 | u/Nidhhiii18 | Reddit | On-demand retrieval confirmed better, lightweight schema index cache, rolling window for corrections log | Fourth independent practitioner confirming lazy loading — rolling window optimisation worth implementing |
+| Apr 11 | u/Sufficient_Dig207 | Reddit r/AI_Agents | How does KB approach hook up to a coding agent — does it replace a skill or complement it | Genuine architectural question flagged to Intelligence Officers for KB v3 documentation |
+| Apr 15 | u/theShku | Reddit | How are you handling your semantic layers — forced distinction between injection-first KB and traditional BI semantic layer | Forced precise articulation of Layer 2 — now standard external framing for the team |
+| Apr 15 | u/theShku | Reddit | OSI standards for context grounding — open-semantic-interchange.org | New community intelligence — flagged to Intelligence Officers for future sprint KB structuring |
+| Apr 17 | u/Inevitable_Raccoon_9 | Reddit r/aiagents | Grep + script approach for consistent fields. OPUS for script generation. Dry run mode. Pre-processing pass committed to KB as structured data | Confirmed tiered extraction approach — pattern matching first, LLM fallback for inconsistent records, flag ambiguous results rather than silently passing low-confidence answers |
+
+**Token optimisation — RESOLVED:**
+Four independent practitioners converged on the same
+answer: load table names first, expand to full columns
+only for tables selected after first-pass query
+planning. Use rolling window on corrections log
+rather than full history. Architecture decision
+confirmed.
+
+**Join key glossary — VALIDATED:**
+@rivestack independently raised the debate. Native
+types per DB with Layer 2 glossary confirmed as
+correct. Built immediately after the reply.
+
+**Institutional knowledge vs semantic layer —
+CLARIFIED:**
+u/theShku's question forced a public distinction
+between our injection-first markdown approach and
+traditional BI semantic layers. This is now the
+standard framing the team uses for Layer 2 externally.
+OSI standards surfaced as new intelligence.
+
+**Embedded structured data extraction — PARTIALLY RESOLVED:**
+u/Inevitable_Raccoon_9 on r/aiagents suggested
+grep + script approach for consistent fields and
+OPUS for script generation. Our reply committed
+the team to a tiered approach: pattern matching
+first, LLM fallback for inconsistent records,
+flag ambiguous results. Pre-processing pass
+committed to KB is worth testing.
 
 ---
 
@@ -364,14 +630,31 @@ Is a Different Person in Every Database
 - **URL:** https://medium.com/@mistiredan/the-join-key-problem-why-the-same-customer-is-a-different-person-in-every-database-10985194c39c
 - **Published:** April 13, 2026
 - **Word count:** ~1,100
-- **Topics covered:**
-  - What the ill-formatted join key problem actually is
-  - Why automatic detection is genuinely difficult
-  - The join key glossary approach
-  - Query generation is easy — institutional knowledge
-  is the hard part
-- **X thread link:** TBC
 - **Notable responses:** Pending
+
+---
+
+#### Mistire — LinkedIn Article
+- **Title:** The Join Key Problem: Why the Same Customer
+Is a Different Person in Every Database
+- **Platform:** LinkedIn
+- **URL:** https://www.linkedin.com/posts/mistire-daniel-87b451229_dataengineering-aiagents-machinelearning-ugcPost-7449983463526625280-mdNM
+- **Published:** April 15, 2026
+- **Status:** ✅ Live
+- **Notable responses:** Pending
+
+---
+
+#### Kidus — Medium Article 3
+- **Title:** Five Ways a Data Agent Fails — and What
+Each One Actually Looks Like in Practice
+- **Platform:** Medium
+- **URL:** https://medium.com/@ktewodros41/five-ways-a-data-agent-fails-and-what-each-one-actually-looks-like-in-practice-4546a6e230dc
+- **Published:** April 15, 2026
+- **Status:** ✅ Live
+- **Word count:** ~1,500
+- **X thread link:** TBC — planned
+- **Notable responses:** TBC
 
 ---
 
@@ -380,24 +663,17 @@ Is a Different Person in Every Database
 | Resource | Applied | Outcome | Notes |
 |----------|---------|---------|-------|
 | Cloudflare Workers free tier | Day 1 | ✅ Completed by Mistire | Setup docs shared with Yosef and Bethel |
+| Cloudflare Sandbox Worker | Apr 15 | ✅ Deployed by Mistire | SANDBOX_URL=https://data-agent-challenge-sandbox.mdwithgod.workers.dev |
 
 ---
 
 ### Week 8 Engagement Summary
 
-**Total external posts:** 10
-- 5 X threads
-  (Thread 1 — Memory Architecture: 31 views,
-  Thread 2 — Team Setup: 14 views,
-  Thread 3 — Mid-Build Update: 17 views,
-  Thread 4 — Karpathy KB Method: 49 views,
-  Thread 5 — a16z Context Layer: 17 views)
-- 2 Reddit posts
-  (Entry 1 — schema loading: 867 views,
-  Entry 2 — human refinement a16z: 290 views)
+**Total external posts confirmed:** 10
+- 5 X threads (31 + 14 + 17 + 49 + 32 views)
+- 2 Reddit posts (1,300+ views + 383 views)
 - 2 Medium articles published
 - 2 X replies to external practitioners
-  (@fabiolauria92, @rivestack)
 
 **Total community comments made:** 6
 - 2 replies to X practitioners
@@ -409,68 +685,337 @@ Is a Different Person in Every Database
 - @rivestack — schema normalisation vs native
   types debate, reply posted with URL confirmed
 - 3 substantive Reddit responses on token
-  optimisation question
-- Reddit Entry 2 response pending — 290 views
-  already within hours of posting
+  optimisation + 1 new reply (Nidhhiii18)
+- Reddit Entry 2 — 383 views, responses pending
 
 **Community intelligence that changed team's
 technical approach:**
-
 1. Token optimisation — RESOLVED via community
-   Load table names first, expand to full columns
-   only after first-pass query planning.
-   Brought to mob session.
-
 2. Join key glossary — VALIDATED via @rivestack
-   Native types per DB with join key glossary
-   in Layer 2 confirmed as correct approach.
-   Flagged to Estif and Melkam for KB v2.
-
-3. Schema-as-a-Database — NEW from Reddit
-   Store schemas in DuckDB/Neo4j, semantic search
-   via MCP, load as Claude skill.
-   Flagged to Intelligence Officers for KB v2.
-
+3. Schema-as-a-Database — NEW — flagged to IOs
 4. Human refinement at scale — OPEN QUESTION
-   Posted to community April 13 — responses
-   pending. Will feed into Week 9 architecture
-   decisions around tribal knowledge capture
-   vs corrections loop discovery.
 
 ---
 
 ## WEEK 9
-*(To be updated)*
+### Last Updated: Friday April 18, 2026
 
 ### Daily Slack Posts
+
 | Date | Content Summary | Link |
 |------|----------------|------|
-| Day 1 — Apr 14 | | |
-| Day 2 — Apr 15 | | |
-| Day 3 — Apr 16 | | |
-| Day 4 — Apr 17 | | |
-| Day 5 — Apr 18 | | |
+| Day 1 — Apr 14 | Interim submission confirmed complete. All GitHub repo requirements verified. Full team progress update posted. Mistire shared action items in response to tutor check-in. Reddit posts on embedded structured data discovery shared with team. X thread on embedded data shared. | Internal Slack — PaLM channel |
+| Day 2 — Apr 15 | Interim submission day. Mistire posted full team progress update. Kidus shared Reddit and X thread links. Estif shared meeting link for agent demo alignment. GitHub interim submission confirmed by Estif. Kidus posted final progress update. Mistire published Join Key Problem article to LinkedIn. Tutor commended social engagement and asked for presentation. Presentation delivered. Kidus shared external engagement Google Doc. Sandbox URL shared by Mistire. New Medium article published by Kidus. | Internal Slack — PaLM channel |
+| Day 3 — Apr 16 | Yosef confirmed action items 1 and 2 solved — IO utils module integrated (join key resolver, schema introspections, multi-pass retrieval all merged, duplicated files merged). Self-correction loop bug solved. Project indexed on DeepWiki by Yosef — link shared for team awareness. Bethel raised dataset distribution — each team member to pick 2-3 datasets for testing before submission deadline. Mistire took agnews and googlelocal. | Internal Slack — PaLM channel |
+| Day 4 — Apr 17 | Yosef shared mob session summary — focus on agent improvement and query tracing. Two priorities agreed: improving agent (context manager + self-correction loop) and tracing wrong answers on bookreview and yelp datasets. All team members to focus on current challenge since submission is tomorrow. Bethel confirmed dataset distribution approach. | Internal Slack — PaLM channel |
+| Day 5 — Apr 18 | Mistire published LinkedIn article — "Two Weeks, One Benchmark, Six People: What We Actually Learned Building a Production Data Agent". Submission day recap covering DAB benchmark, 3-layer architecture, corrections log, and team role structure. | Internal Slack — PaLM channel |
 
-### X Threads
+---
 
-#### Thread 6 — Benchmark Thread
-- Date:
-- URL:
-- Views:
-- Topic:
-- Notable responses:
+**Day 2 Full Post — Mistire (Apr 15, 4:26 AM):**
+> PaLM Team — Progress Update
+> Tuesday April 15 | Interim Submission Day
+>
+> Newly Shipped — Yosef & Bethel:
+> Inception document finalised — mob session approval
+> recorded — full team approved. Docker containers for
+> PostgreSQL (5 databases) and MongoDB (Yelp + News)
+> confirmed working. Database access credentials shared.
+> Symlink setup script shared. MCP tool implemented.
+> Agent development started.
+>
+> Newly Shipped — Estif & Melkam:
+> Architecture confirmed. KB v2 domain knowledge
+> structure complete. 3 utility modules ready:
+> Join Key Resolver, Retrieval, Schema Introspect.
+>
+> Newly Shipped — Kidus & Mistire:
+> Cloudflare Workers fully configured and documented.
+> Community log synchronised. Medium article published.
+> Reddit post live — Karpathy KB methodology.
 
-#### Thread 7 — Final Community Thread / DAB PR Post
-- Date:
-- URL:
-- Views:
-- Topic:
-- Notable responses:
+**Day 2 Full Post — Kidus (Apr 15, 5:57 PM):**
+> Progress update: Shipped & Completed Tasks.
+> Full interim submission report and PDF submitted.
+> GitHub repo structured and finalised. Medium article
+> converted and posted to LinkedIn. New community
+> engagement posts submitted across Reddit and X.
+> Findings shared to Slack. External community
+> engagement ongoing.
+>
+> Action Items:
+> Yosef: module consolidation + bug fix
+> Melkam: KB NLP extraction update
+> Estif: evaluation harness finalisation
+> Kidus & Mistire: final community posts
+
+**Day 2 Additional — Tutor guidance (Apr 15, 6:25 AM):**
+> Hi Team, you are progressing well and have good
+> social engagement — present that in addition to
+> what Kidus reported on the standup. Take time
+> until 10:00 to sync and prepare presentation.
+
+**Day 2 Additional — Mistire (Apr 15, 5:00 AM):**
+> Sandbox URL shared:
+**Day 2 Additional — Kidus (Apr 15, 7:06 AM):**
+> New Medium article published:
+> https://medium.com/p/4546a6e230dc
+> Five Ways a Data Agent Fails — and What Each One
+> Actually Looks Like in Practice
+
+**Day 3 Full Post — Yosef (Apr 16, 3:11 AM):**
+> Morning team. Action Items 1 and 2 are solved.
+> Integrated IO utils module with ours: joint key
+> resolver, schema introspections and multi-pass
+> retrieval — all duplicated files merged. Self
+> correction loop bug is also solved. Now
+> continuously reviewing agent core, improving
+> evaluation harness and finding ways to submit
+> to the DAB benchmark.
+
+**Day 3 Additional — Yosef (Apr 16, 3:14 AM):**
+> Indexed our project on DeepWiki so we all
+> understand what is built and its current structure
+> and architecture.
+> https://deepwiki.com/PALM-Oracle-Forge/data-agent-challenge
+
+**Day 4 Full Post — Yosef (Apr 17, 12:55 AM):**
+> Good morning team. Yesterday's mob session was on
+> how we can improve our agent for passing the DAB
+> benchmark queries. Two ideas discussed:
+> 1. Improving the agent
+> 2. Tracing the wrong answers by running queries
+>    and seeing the traces
+>
+> On the agent side — focus on context manager and
+> self-correction loop. On the queries — agreed to
+> work on bookreview and yelp dataset.
+>
+> ✅ All team members to focus on the current
+> challenge since submission is tomorrow.
+
+---
+
+### X Threads — Week 9
+
+#### Thread 6 — Embedded Structured Data Discovery
+- **Date:** April 14, 2026
+- **URL:** https://x.com/Kidus5T99409/status/2044165219908210861
+- **Views:** 21
+- **Topic:** Discovery that some DAB datasets have
+no dedicated columns for structured data. Must
+extract structured fact from text before any
+calculation. KB Layer 2 documents embedded fields.
+- **Notable responses:** None captured
+
+---
+
+#### Thread — Join Key Problem (Mistire @Mistire37)
+- **Date:** April 14, 2026
+- **Account:** @Mistire37
+- **Thread tweets:**
+  1. [Tweet 1 — Demo vs reality](https://x.com/i/status/2044037729902633108) — 15 views
+  2. [Tweet 2 — DAB benchmark context](https://x.com/Mistire37/status/2044038329801290183) — 36 views
+  3. [Tweet 3 — Join key problem detail](https://x.com/Mistire37/status/2044038796535017623) — 14 views
+  4. [Tweet 4 — Join key glossary fix](https://x.com/Mistire37/status/2044039744271581207) — 24 views
+  5. [Tweet 5 — Context engineering lesson](https://x.com/Mistire37/status/2044041452586500462) — 13 views
+- **Total views:** 102
+- **Topic:** The join key problem in production data
+  agents. Same customer stored as integer 10023 in
+  PostgreSQL and 'CUST-10023' in MongoDB. DAB
+  benchmark context — 54 queries, 4 database systems,
+  54% best score. Fix: join key glossary injected
+  into agent context at session start. Core lesson:
+  query generation is easy — context engineering
+  is what closes the demo-to-production gap.
+- **Notable responses:** None captured
+
+---
+
+#### Thread 7 — Five Failure Modes
+- **Date:** TBC — planned
+- **URL:** TBC
+- **Views:** TBC
+- **Topic:** Five failure categories before the
+benchmark run.
+- **Notable responses:** TBC
+
+---
+
+#### Thread 8 — DAB Submission Recap (Mistire @Mistire37)
+- **Date:** April 18, 2026
+- **Account:** @Mistire37
+- **Thread tweets:**
+  1. [Tweet 1 — Submission day intro](https://x.com/Mistire37/status/2045399956740088290) — 4 views
+  2. [Tweet 2 — What DataAgentBench tests](https://x.com/Mistire37/status/2045400388082319449) — 7 views
+  3. [Tweet 3 — The context bottleneck](https://x.com/Mistire37/status/2045400627350507650) — 6 views
+  4. [Tweet 4 — 3-layer context fix](https://x.com/Mistire37/status/2045401523660738647) — 7 views
+  5. [Tweet 5 — Self-correction loop](https://x.com/Mistire37/status/2045401689281191983) — 10 views
+  6. [Tweet 6 — Discipline over optimisation](https://x.com/Mistire37/status/2045401880952512706) — 8 views
+- **Total views:** 42
+- **Topic:** Two-week DAB build submission recap.
+  DataAgentBench context — 54 queries, 4 DB systems,
+  54.3% ceiling as an engineering problem not a model
+  problem. 3-layer context architecture fix. Self-
+  correction loop and failure logging. Core lesson:
+  build the harness before optimising the agent.
+- **Notable responses:** None captured
+
+---
+
+### Community Participation — Week 9
+
+#### Entry 4 — Reddit r/learnmachinelearning
+- **Date:** April 14, 2026
+- **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1sll6z2/help_we_discovered_that_some_enterprise_datasets/
+- **Views:** 250
+- **Upvotes:** 0
+- **Responses received:** None yet — monitoring
+
+---
+
+#### Entry 5 — Reddit r/aiagents
+- **Date:** April 14, 2026
+- **Direct link:** https://www.reddit.com/r/aiagents/comments/1sll5ph/help_we_discovered_that_some_enterprise_datasets/
+- **Views:** 479
+- **Upvotes:** 2
+- **Responses received:**
+
+  **u/Inevitable_Raccoon_9:**
+  > "I didnt face such question with DB while coding
+  but I had same problems with lots of texts that
+  were unstructured. Literally told OPUS the problem
+  and he read the hundreds of texts and analysed
+  them — then told me 'I can write a script that
+  extracts all data like you need it.' It was
+  literally just grep against the data — and a
+  script is way faster than an AI."
+
+  **Our reply:**
+  > "That is actually a really useful framing — and
+  the grep approach is underrated for fields where
+  the structure is consistent enough. The challenge
+  we are hitting is specifically the inconsistent
+  cases — same type of information appearing in
+  three or four different formats across records.
+  What we are leaning toward is a tiered approach:
+  try pattern matching first, fall back to an LLM
+  extraction call only for records where the pattern
+  fails, and flag any record where extraction returns
+  ambiguous results rather than silently passing a
+  low-confidence answer downstream. The silent wrong
+  answer is the failure mode we are most worried
+  about. The OPUS suggestion for designing the
+  extraction script is well taken — a one-time
+  extraction pass over the known fields could be
+  committed to the KB as structured data rather than
+  requiring the agent to re-extract at query time."
+
+- **Community intel extracted:**
+  Tiered extraction approach confirmed — pattern
+  matching first, LLM fallback for inconsistent
+  records. Pre-processing pass committed to KB
+  worth testing. Dry run mode is a practical tip.
+
+---
+
+#### Entry 6 — Reddit r/learnmachinelearning
+- **Date:** April 15, 2026
+- **Direct link:** https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/question_for_teams_that_have_run_agents_against/
+- **Views:** 123
+- **Upvotes:** 1
+- **Note:** Post removed by Reddit's filters after
+  initial posting — still visible but limited reach
+- **Responses received:**
+
+  **u/theShku:**
+  > "How are you handling your semantic layers?"
+
+  **Our reply:**
+  > "We are not using a traditional semantic layer
+  — no LookML, no dbt metrics. Instead we built an
+  institutional knowledge layer — three structured
+  markdown documents injected directly into the
+  agent's context. Domain term definitions, dataset
+  overview, and corrections log. Designed to be
+  injected into a context window, not queried. No
+  embeddings, no vector search. Every document must
+  pass an injection test before committed."
+  - Our reply URL: https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/comment/ogenrwc/
+
+  **u/theShku counter-reply:**
+  > "We're following recommended OSI standards for
+  context grounding.
+  https://open-semantic-interchange.org/"
+
+- **Community intel extracted:**
+  OSI standards for context grounding surfaced.
+  open-semantic-interchange.org flagged for
+  Intelligence Officers. Injection-first articulation
+  now canonical external description of Layer 2.
+
+---
+
+### Articles Published — Week 9
+
+#### Mistire — LinkedIn Article
+- **Title:** The Join Key Problem
+- **Platform:** LinkedIn
+- **URL:** https://www.linkedin.com/posts/mistire-daniel-87b451229_dataengineering-aiagents-machinelearning-ugcPost-7449983463526625280-mdNM
+- **Published:** April 15, 2026
+- **Status:** ✅ Live
+- **Notable responses:** Pending
+
+---
+
+#### Kidus — Medium Article 3
+- **Title:** Five Ways a Data Agent Fails — and What
+Each One Actually Looks Like in Practice
+- **Platform:** Medium
+- **URL:** https://medium.com/@ktewodros41/five-ways-a-data-agent-fails-and-what-each-one-actually-looks-like-in-practice-4546a6e230dc
+- **Published:** April 15, 2026
+- **Status:** ✅ Live
+- **Word count:** ~1,500
+- **X thread link:** TBC — planned
+- **Notable responses:** TBC
+
+---
+
+#### Mistire — LinkedIn Article 2
+- **Title:** Two Weeks, One Benchmark, Six People: What
+We Actually Learned Building a Production Data Agent
+- **Platform:** LinkedIn
+- **URL:** https://www.linkedin.com/pulse/two-weeks-one-benchmark-six-people-what-we-actually-learned-daniel-kr8nf
+- **Published:** April 18, 2026
+- **Status:** ✅ Live
+- **Summary:** Submission-day retrospective covering
+  DAB benchmark reality, 3-layer context architecture,
+  join key problem, evaluation-harness-first approach,
+  unstructured text as unsolved problem, and team
+  role compounding (Drivers / IOs / Signal Corps).
+- **Notable responses:** Pending
+
+---
+
+### Week 9 Community Intelligence
+
+| Date | Source | Platform | Intel | Impact on Team |
+|------|--------|----------|-------|----------------|
+| Apr 15 | u/theShku | Reddit | Semantic layers question — forced distinction between injection-first KB and traditional BI semantic layer | Forced precise articulation of Layer 2 — now standard external framing |
+| Apr 15 | u/theShku | Reddit | OSI standards for context grounding — open-semantic-interchange.org | New community intelligence — flagged to Intelligence Officers |
+| Apr 17 | u/Inevitable_Raccoon_9 | Reddit r/aiagents | Grep + script approach for consistent fields. OPUS for script generation. Pre-processing pass committed to KB. | Confirmed tiered extraction approach — pattern matching first, LLM fallback, flag ambiguous results |
+
+**Embedded structured data extraction — PARTIALLY RESOLVED:**
+u/Inevitable_Raccoon_9 suggested grep + OPUS
+approach. Our reply committed team to tiered
+extraction: pattern matching first, LLM fallback
+for inconsistent records, flag ambiguous results.
+Pre-processing pass committed to KB worth testing.
 
 ---
 
 ## COMPLETE PORTFOLIO SUMMARY
-*(Final — to be completed by April 18)*
+*(Updated April 17, 2026)*
 
 | Date | Platform | Type | URL | Metrics |
 |------|----------|------|-----|---------|
@@ -479,22 +1024,24 @@ technical approach:**
 | Apr 9–10 | X | Thread 3 — Mid-Build Update | https://x.com/Kidus5T99409/status/2042344151518232998 | 17 views |
 | Apr 9 | X | Reply to @fabiolauria92 | https://x.com/Kidus5T99409/status/2042344151518232998 | 14 views |
 | Apr 9 | X | Reply to @rivestack | https://x.com/Kidus5T99409/status/2042897418534924327 | 7 views |
-| Apr 10 | Reddit | Post + replies — schema loading | https://www.reddit.com/r/learnmachinelearning/comments/1shx8ag/ | 867 views |
+| Apr 10 | Reddit | Post — schema loading | https://www.reddit.com/r/learnmachinelearning/comments/1shx8ag/ | 1,300+ views |
 | Apr 10 | Medium | Article 1 — Kidus & Mistire | https://medium.com/@ktewodros41/were-building-a-data-agent-that-competes-on-a-uc-berkeley-benchmark-937d6370eee4 | TBC |
 | Apr 11 | X | Thread 4 — Karpathy KB Method | https://x.com/Kidus5T99409/status/2043065456173387782 | 49 views |
-| Apr 13 | X | Thread 5 — a16z Context Layer | [paste URL] | 17 views |
-| Apr 13 | Reddit | Post — human refinement a16z | https://www.reddit.com/r/learnmachinelearning/comments/1skrzsh/ | 290 views |
+| Apr 11 | Reddit | Post — Karpathy KB r/AI_Agents | https://www.reddit.com/r/AI_Agents/comments/1sitlhf/ | 667 views |
+| Apr 13 | X | Thread 5 — a16z Context Layer | https://x.com/Kidus5T99409/status/2043837626114027593 | 32 views |
+| Apr 13 | Reddit | Post — human refinement | https://www.reddit.com/r/learnmachinelearning/comments/1skrzsh/ | 383 views |
 | Apr 13 | Medium | Article 2 — Mistire Join Key Problem | https://medium.com/@mistiredan/the-join-key-problem-why-the-same-customer-is-a-different-person-in-every-database-10985194c39c | TBC |
-| Apr 14 | X | Thread 6 — Benchmark | TBC | TBC |
-| Apr 17 | X | Thread 7 — Results | TBC | TBC |
-| Apr 18 | X | DAB PR Announcement | TBC | TBC |
+| Apr 14 | X | Thread 6 — Embedded Structured Data (Kidus) | https://x.com/Kidus5T99409/status/2044165219908210861 | 21 views |
+| Apr 14 | X | Thread — Join Key Problem (Mistire) | https://x.com/Mistire37/status/2044038329801290183 | 102 views (5 tweets) |
+| Apr 14 | Reddit | Post — embedded data r/learnmachinelearning | https://www.reddit.com/r/learnmachinelearning/comments/1sll6z2/ | 250 views |
+| Apr 14 | Reddit | Post — embedded data r/aiagents | https://www.reddit.com/r/aiagents/comments/1sll5ph/ | 479 views |
+| Apr 15 | LinkedIn | Article — Mistire Join Key Problem | https://www.linkedin.com/posts/mistire-daniel-87b451229_dataengineering-aiagents-machinelearning-ugcPost-7449983463526625280-mdNM | TBC |
+| Apr 15 | Reddit | Post — failure mode classification | https://www.reddit.com/r/learnmachinelearning/comments/1smipwi/ | 123 views |
+| Apr 15 | Medium | Article 3 — Kidus Five Failure Modes | https://medium.com/@ktewodros41/five-ways-a-data-agent-fails-and-what-each-one-actually-looks-like-in-practice-4546a6e230dc | TBC |
+| Apr 18 | X | Thread 8 — DAB Submission Recap (Mistire) | https://x.com/Mistire37/status/2045399956740088290 | 42 views (6 tweets) |
+| Apr 18 | LinkedIn | Article 4 — Mistire Two Weeks One Benchmark | https://www.linkedin.com/pulse/two-weeks-one-benchmark-six-people-what-we-actually-learned-daniel-kr8nf | Pending |
+
 
 ---
 
-## ⚠️ Outstanding Before Tuesday Interim Submission
 
-- [ ] Update Reddit Entry 2 responses after 24hrs
-- [ ] Add Thread 4 Karpathy notable responses
-      after monitoring
-
-- [ ] Confirm Karpathy Reddit post link if posted

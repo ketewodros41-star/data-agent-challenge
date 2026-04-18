@@ -11,19 +11,25 @@ Team Palm has built a benchmark-ready data agent for DataAgentBench that answers
 
 ## **Honest FAQ  user**
 
-### **Q1. What does this agent do?** It answers DAB benchmark questions by selecting the right databases, generating and executing queries, combining results across systems when needed, and returning an answer with a trace of how it got there.
+### **Q1. What does this agent do?** 
+It answers DAB benchmark questions by selecting the right databases, generating and executing queries, combining results across systems when needed, and returning an answer with a trace of how it got there.
 
-### **Q2. What kinds of questions can it answer?** It is designed for enterprise-style analytics questions that may require joining data across PostgreSQL, SQLite, MongoDB, and DuckDB, resolving mismatched IDs, extracting facts from text fields, and applying domain definitions from the Knowledge Base.
+### **Q2. What kinds of questions can it answer?**
+ It is designed for enterprise-style analytics questions that may require joining data across PostgreSQL, SQLite, MongoDB, and DuckDB, resolving mismatched IDs, extracting facts from text fields, and applying domain definitions from the Knowledge Base.
 
-### **Q3. What can it not do yet?** It does not guarantee perfect performance on all 54 DAB queries at the start of the sprint, and early versions may support only two database types before the full four-database setup is complete. It may also fail on queries that require missing domain definitions or unimplemented repair logic until those are added through the corrections loop.
+### **Q3. What can it not do yet?** 
+It does not guarantee perfect performance on all 54 DAB queries at the start of the sprint, and early versions may support only two database types before the full four-database setup is complete. It may also fail on queries that require missing domain definitions or unimplemented repair logic until those are added through the corrections loop.
 
 ## **Honest FAQ — technical**
 
-### **Q1. What could go wrong?** The biggest risks are failed database setup, incorrect MCP tool configuration, brittle query execution across heterogeneous databases, and false confidence from local fixes that are not validated by the harness or regression suite.
+### **Q1. What could go wrong?** 
+The biggest risks are failed database setup, incorrect MCP tool configuration, brittle query execution across heterogeneous databases, and false confidence from local fixes that are not validated by the harness or regression suite.
 
-### **Q2. What is the hardest technical problem in this sprint?** The hardest problem is not raw query generation; it is building a self-correcting system that can identify whether a failure comes from wrong routing, wrong join-key format, missing context, bad text transformation, or database-specific execution issues, then recover in a measurable way.
+### **Q2. What is the hardest technical problem in this sprint?** 
+The hardest problem is not raw query generation; it is building a self-correcting system that can identify whether a failure comes from wrong routing, wrong join-key format, missing context, bad text transformation, or database-specific execution issues, then recover in a measurable way.
 
-### **Q3. What dependencies does this sprint rely on?** This sprint depends on DAB datasets loading successfully, MCP Toolbox exposing the required database tools, a functioning sandbox for code execution, model/API access for repeated evaluation runs, and a maintained Knowledge Base that is injection-tested before use.
+### **Q3. What dependencies does this sprint rely on?** 
+This sprint depends on DAB datasets loading successfully, MCP Toolbox exposing the required database tools, a functioning sandbox for code execution, model/API access for repeated evaluation runs, and a maintained Knowledge Base that is injection-tested before use.
 
 ## **Key decisions**
 

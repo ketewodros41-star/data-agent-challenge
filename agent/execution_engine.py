@@ -43,6 +43,7 @@ from .mcp_toolbox import MCPToolbox
 
 
 class ExecutionEngine:
+    """Execute legacy query plans and typed runtime plans."""
     """Execute query plans, returning one QueryResult per sub-query.
 
     Supports two calling conventions:
@@ -67,6 +68,26 @@ class ExecutionEngine:
         # Legacy interface
         self._db_configs: Dict[str, dict] = db_configs or {}
         self.toolbox = toolbox or MCPToolbox(db_configs=self._db_configs)
+        self.mcp_client = mcp_client or MCPClient(backend=self.toolbox)
+        self.sandbox_client = sandbox_client or SandboxClient()
+        self.self_correction = self_correction
+
+    def execute_plan(
+        self,
+        plan: QueryPlan | TypedExecutionPlan,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> List[QueryResult] | ExecutionResult:
+        """Dispatch to the legacy or typed runtime path."""
+        if hasattr(plan, "steps"):
+            return self._execute_typed_plan(plan, context or {})
+        return self._execute_legacy_plan(plan, context or {})
+
+    def _execute_typed_plan(
+        self,
+        plan: TypedExecutionPlan,
+        context: Dict[str, Any],
+    ) -> ExecutionResult:
+        trace: List[ExecutionTrace] = []
         # Typed scaffold interface
         self._mcp_client = mcp_client
         self._sandbox_client = sandbox_client
@@ -111,6 +132,35 @@ class ExecutionEngine:
         correction_applied = False
         current_plan = plan
 
+        while attempts < current_plan.max_retries:
+            attempts += 1
+            outputs: Dict[str, Any] = {}
+            failure: Optional[FailureRecord] = None
+
+            for step in current_plan.steps:
+                step_result = self._execute_typed_step(
+                    step=step,
+                    attempt=attempts,
+                    context=context,
+                    outputs=outputs,
+                )
+                trace.append(step_result["trace"])
+
+                if not step_result["success"]:
+                    failure = FailureRecord(
+                        step_id=step.step_id,
+                        route=step_result["trace"].route,
+                        error=step_result["error"] or "Unknown execution error",
+                        attempt=attempts,
+                        trace=trace.copy(),
+                    )
+                    break
+
+                if step.output_key:
+                    outputs[step.output_key] = step_result["output"]
+
+            if failure is None:
+                final_output = self._resolve_final_output(current_plan, outputs)
         while True:
             attempts += 1
             attempt_outputs: Dict[str, Any] = {}
@@ -213,6 +263,222 @@ class ExecutionEngine:
                     success=True,
                     status=ExecutionStatus.SUCCEEDED,
                     final_output=final_output,
+                    outputs=outputs,
+                    trace=trace,
+                    attempts=attempts,
+                    correction_applied=correction_applied,
+                    error=None,
+                )
+
+            decision = self._handle_failure(current_plan, failure)
+            if not decision.retryable:
+                return ExecutionResult(
+                    success=False,
+                    status=ExecutionStatus.FAILED,
+                    final_output=None,
+                    outputs=outputs,
+                    trace=trace,
+                    attempts=attempts,
+                    correction_applied=correction_applied,
+                    error=failure.error,
+                )
+
+            correction_applied = True
+            trace.append(
+                ExecutionTrace(
+                    step_id=failure.step_id,
+                    step_kind=self._lookup_step(current_plan, failure.step_id).kind,
+                    route=StepRoute.SELF_CORRECTION,
+                    status=ExecutionStatus.RETRYING,
+                    attempt=attempts,
+                    execution_time=0.0,
+                    error=failure.error,
+                    metadata={"reason": decision.reason},
+                )
+            )
+            current_plan = decision.updated_plan or current_plan
+
+        return ExecutionResult(
+            success=False,
+            status=ExecutionStatus.FAILED,
+            final_output=None,
+            outputs={},
+            trace=trace,
+            attempts=attempts,
+            correction_applied=correction_applied,
+            error="Retry budget exhausted",
+        )
+
+    def _execute_typed_step(
+        self,
+        step: ExecutionStep,
+        attempt: int,
+        context: Dict[str, Any],
+        outputs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        route = self._resolve_route(step)
+        started_at = time.perf_counter()
+
+        if route is StepRoute.MCP_TOOLBOX:
+            request = MCPToolCall(
+                tool_name=step.tool_name or "",
+                parameters=dict(step.parameters),
+                database_type=step.database_type,
+                context=context,
+            )
+            result = self.mcp_client.call_tool(request)
+            elapsed = time.perf_counter() - started_at
+            if not result.success:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": result.error,
+                    "trace": ExecutionTrace(
+                        step_id=step.step_id,
+                        step_kind=step.kind,
+                        route=route,
+                        status=ExecutionStatus.FAILED,
+                        attempt=attempt,
+                        execution_time=elapsed,
+                        error=result.error,
+                        metadata={"tool_name": request.tool_name},
+                    ),
+                }
+
+            return {
+                "success": True,
+                "output": result.data,
+                "error": None,
+                "trace": ExecutionTrace(
+                    step_id=step.step_id,
+                    step_kind=step.kind,
+                    route=route,
+                    status=ExecutionStatus.SUCCEEDED,
+                    attempt=attempt,
+                    execution_time=elapsed,
+                    output=result.data,
+                    output_key=step.output_key,
+                    metadata={"tool_name": request.tool_name},
+                ),
+            }
+
+        sandbox_request = self._build_sandbox_request(step, attempt, context, outputs)
+        sandbox_result = (
+            self.sandbox_client.validate(sandbox_request)
+            if step.kind is StepKind.VALIDATE
+            else self.sandbox_client.execute(sandbox_request)
+        )
+        elapsed = time.perf_counter() - started_at
+        metadata = {
+            "validation_status": sandbox_result.validation_status,
+            "sandbox_trace": sandbox_result.trace,
+            "trace_id": sandbox_request.trace_id,
+        }
+
+        if not sandbox_result.success:
+            return {
+                "success": False,
+                "output": None,
+                "error": sandbox_result.error_if_any or "Sandbox execution failed",
+                "trace": ExecutionTrace(
+                    step_id=step.step_id,
+                    step_kind=step.kind,
+                    route=route,
+                    status=ExecutionStatus.FAILED,
+                    attempt=attempt,
+                    execution_time=elapsed,
+                    error=sandbox_result.error_if_any,
+                    metadata=metadata,
+                ),
+            }
+
+        return {
+            "success": True,
+            "output": sandbox_result.result,
+            "error": None,
+            "trace": ExecutionTrace(
+                step_id=step.step_id,
+                step_kind=step.kind,
+                route=route,
+                status=ExecutionStatus.SUCCEEDED,
+                attempt=attempt,
+                execution_time=elapsed,
+                output=sandbox_result.result,
+                output_key=step.output_key,
+                metadata=metadata,
+            ),
+        }
+
+    def _handle_failure(
+        self,
+        plan: TypedExecutionPlan,
+        failure: FailureRecord,
+    ) -> CorrectionDecision:
+        if self.self_correction is not None and hasattr(self.self_correction, "handle_failure"):
+            return self.self_correction.handle_failure(plan, failure)
+
+        if failure.attempt >= plan.max_retries:
+            return CorrectionDecision(
+                retryable=False,
+                reason="Retry budget exhausted",
+                updated_plan=None,
+            )
+
+        return CorrectionDecision(
+            retryable=True,
+            reason="generic retry after execution failure",
+            updated_plan=plan,
+        )
+
+    def _build_sandbox_request(
+        self,
+        step: ExecutionStep,
+        attempt: int,
+        context: Dict[str, Any],
+        outputs: Dict[str, Any],
+    ):
+        from agent.types import SandboxExecutionRequest
+
+        inputs_payload = {ref: outputs.get(ref) for ref in step.input_refs}
+        return SandboxExecutionRequest(
+            code_plan=step.code or "",
+            trace_id=f"{step.step_id}:attempt-{attempt}",
+            inputs_payload=inputs_payload,
+            db_type=step.database_type or step.kind.value,
+            context={
+                "shared_context": context,
+                "step_parameters": dict(step.parameters),
+                "available_outputs": outputs,
+            },
+            step_id=step.step_id,
+        )
+
+    def _resolve_route(self, step: ExecutionStep) -> StepRoute:
+        if step.route is not None:
+            return step.route
+        if step.kind is StepKind.DATABASE:
+            return StepRoute.MCP_TOOLBOX
+        return StepRoute.SANDBOX
+
+    def _lookup_step(self, plan: TypedExecutionPlan, step_id: str) -> ExecutionStep:
+        for step in plan.steps:
+            if step.step_id == step_id:
+                return step
+        return plan.steps[-1]
+
+    def _resolve_final_output(
+        self,
+        plan: TypedExecutionPlan,
+        outputs: Dict[str, Any],
+    ) -> Any:
+        if plan.final_output_key:
+            return outputs.get(plan.final_output_key)
+        if not outputs:
+            return None
+        last_key = next(reversed(outputs))
+        return outputs[last_key]
+
+    def _execute_legacy_plan(
                     outputs=attempt_outputs,
                     trace=trace + attempt_trace,
                     attempts=attempts,
@@ -394,6 +660,7 @@ class ExecutionEngine:
             return duckdb_tool, {"sql": normalized_query}
 
         if db_type == "mongodb":
+            collection, pipeline = self._parse_mongo_query(sq.query)
             collection, pipeline = self._parse_mongo_query(normalized_query)
             tool_name = "find_yelp_checkins" if collection == "checkin" else "find_yelp_businesses"
             request_payload = self._build_mongo_find_payload(pipeline)
@@ -441,6 +708,7 @@ class ExecutionEngine:
         return None
 
     def _parse_mongo_query(self, query: str) -> tuple[str, str]:
+        collection = "checkin" if "checkin" in query.lower() else "business"
         """Extract collection hint and valid JSON pipeline from a MongoDB query string.
 
         The query string is what the LLM generated — typically a JSON aggregation

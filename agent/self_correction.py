@@ -151,6 +151,25 @@ class SelfCorrectionLoop:
         failure: Any,
     ) -> Any:
         """
+        Typed-runtime hook.
+
+        The typed execution engine uses this narrower contract; the main
+        legacy correction flow still goes through execute_with_correction().
+        """
+        from agent.types import CorrectionDecision
+
+        retry_budget = getattr(plan, "max_retries", 1)
+        if getattr(failure, "attempt", retry_budget) >= retry_budget:
+            return CorrectionDecision(
+                retryable=False,
+                reason="Retry budget exhausted",
+                updated_plan=None,
+            )
+        return CorrectionDecision(
+            retryable=True,
+            reason="retry after detected execution failure",
+            updated_plan=plan,
+        )
         Default retry policy used by the typed ExecutionEngine scaffold.
 
         Subclass this method to implement custom correction logic.

@@ -83,6 +83,40 @@ The agent must know these definitions before answering — they cannot be inferr
 | "contract duration" | `ContractTerm` in months |
 | "pipeline stage order" | Prospecting → Qualification → Needs Analysis → Value Proposition → Id. Decision Makers → Perception Analysis → Proposal/Price Quote → Negotiation/Review → Closed Won/Lost |
 
+### Stage Identification from Tasks/Activities
+
+**CRITICAL RULE: When asked "what stage should this opportunity be in based on its tasks/activities", look at the Task subjects and descriptions. Use the activity-to-stage mapping below. Do NOT rely solely on the current `StageName` in the Opportunity record — the question is asking whether the stage is ACCURATE.**
+
+**Simplified answer labels** (used in questions) → **Salesforce stage name**:
+- `'Negotiation'` → `Negotiation/Review`
+- `'Quote'` → `Proposal/Price Quote`
+- `'Closed'` → `Closed Won` or `Closed Lost`
+- `'Discovery'` → (non-standard, treat as early Needs Analysis / Qualification)
+
+**Activity → Stage mapping** (match Task Subject or Description):
+| Activity keywords in Task/Subject | Correct stage |
+|---|---|
+| "prepare contract", "contract for approval", "contract review", "contract signing", "review terms" | **Negotiation** |
+| "send quote", "prepare proposal", "price quote", "quote approval", "pricing discussion" | **Quote** |
+| "discovery call", "needs assessment", "demo", "product demo", "requirements gathering" | **Discovery** |
+| "qualify", "qualification call", "budget check", "BANT" | **Qualification** |
+| "close deal", "final approval", "sign contract", "deal closed" | **Closed** |
+
+**Matching rule:** Read ALL task subjects/descriptions for the opportunity, map to the stage above, and report the stage that best matches the ACTUAL work being done. If tasks indicate "Negotiation" work (contract prep, term review) but `StageName` shows an earlier stage, the correct answer is **Negotiation**.
+
+### BANT Lead Qualification — Exact Failure Criteria
+
+**CRITICAL RULE: A BANT factor FAILS only when there is explicit, direct evidence of failure in the transcript. Default = PASS for any factor not explicitly contradicted. Do NOT flag a factor as failing merely because it was not mentioned, was discussed ambiguously, or was only partially addressed.**
+
+| Factor | Fails ONLY when transcript explicitly shows... | Does NOT fail when... |
+|---|---|---|
+| **Budget** | Contact states budget is unavailable, frozen, not allocated, or explicitly denied | Budget is mentioned in passing, not yet confirmed, or under discussion |
+| **Authority** | Contact states they are NOT the decision-maker, must escalate to someone else, or lacks approval power | Contact is a stakeholder but their authority level is unclear |
+| **Need** | Contact states they have no problem, no use case, or explicitly rejects the solution | Need is acknowledged but solution fit is uncertain |
+| **Timeline** | Contact states they have no timeline, are not buying this quarter/year, or explicitly defers indefinitely | Timeline is vague, not yet set, or "to be determined" |
+
+**Scoring rule:** Return ONLY the factors with explicit failure evidence. If a factor is merely uncertain or unconfirmed, it does NOT fail. Fewer factors is better than over-reporting.
+
 ---
 
 ## agnews

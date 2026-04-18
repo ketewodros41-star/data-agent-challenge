@@ -18,12 +18,14 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
+from agent.agentic_loop import AgenticLoop, AgenticResult, build_schema_context
 from agent.context_manager import ContextManager
 from agent.execution_engine import ExecutionEngine
 from agent.llm_client import LLMClient
 from agent.mcp_toolbox import MCPToolbox
 from agent.models.models import QueryPlan, QueryResult
 from agent.query_router import QueryRouter
+from agent.sandbox_client import SandboxClient
 from agent.self_correction import SelfCorrectionLoop
 from eval.harness import EvaluationHarness
 
@@ -110,8 +112,19 @@ class OracleForgeAgent:
         self,
         db_configs: Optional[Dict[str, dict]] = None,
         session_id: Optional[str] = None,
+        agent_mode: Optional[bool] = None,
+        max_iterations: Optional[int] = None,
     ):
         self._session_id = session_id or str(uuid.uuid4())
+        # Agentic mode: LLM drives every iteration (DAB-runner style).
+        # Default=True (env var AGENT_MODE=false to override).
+        if agent_mode is None:
+            agent_mode = os.getenv("AGENT_MODE", "true").lower() not in ("false", "0", "no")
+        self._agent_mode = agent_mode
+        # Max LLM iterations for agentic loop. CLI arg takes priority over env var.
+        self._max_iterations = max_iterations if max_iterations is not None else int(
+            os.getenv("AGENTIC_MAX_ITERATIONS", "20")
+        )
         # Explicit configs take priority; discovery runs lazily per-query for any
         # database not already present (keyed by DAB dataset name, e.g. "bookreview").
         self._db_configs: Dict[str, dict] = db_configs or {}
@@ -130,7 +143,12 @@ class OracleForgeAgent:
         # Initialise components (all share the same MCPToolbox instance)
         self._ctx_manager = ContextManager(self._db_configs, toolbox=self._toolbox)
         self._router = QueryRouter(client=self._client)
-        self._engine = ExecutionEngine(toolbox=self._toolbox, db_configs=self._db_configs)
+        self._sandbox_client = SandboxClient()
+        self._engine = ExecutionEngine(
+            toolbox=self._toolbox,
+            db_configs=self._db_configs,
+            sandbox_client=self._sandbox_client
+        )
         self._correction_loop = SelfCorrectionLoop(
             execution_engine=self._engine,
             context_manager=self._ctx_manager,
@@ -261,13 +279,38 @@ class OracleForgeAgent:
         if toolbox_cfg:
             return toolbox_cfg
 
-        # 3. Scan known DAB directory structure for local files
-        dataset_dir = os.path.join(_DAB_ROOT, f"query_{db_id}", "query_dataset")
-        if os.path.isdir(dataset_dir):
-            for ext, db_type_name in (("*.duckdb", "duckdb"), ("*.db", "sqlite")):
+        # 3. Scan known DAB directory structure for local files (SQLite/DuckDB)
+        # Try direct match first: e.g. query_bookreview/query_dataset
+        dataset_dirs = [
+            os.path.join(_DAB_ROOT, f"query_{db_id}", "query_dataset"),
+            # Also try looking into ALL query_* folders if it's a generic name like 'user_database'
+        ]
+        
+        # If it's a generic name, we might be inside a specific dataset run
+        # scan for any query_* that might contain this db file
+        for qdir in _glob.glob(os.path.join(_DAB_ROOT, "query_*")):
+            dataset_dirs.append(os.path.join(qdir, "query_dataset"))
+
+        for dataset_dir in dataset_dirs:
+            if not os.path.isdir(dataset_dir):
+                continue
+            for ext, db_type_name in (("*.duckdb", "duckdb"), ("*.db", "sqlite"), ("*.sqlite", "sqlite")):
                 matches = sorted(_glob.glob(os.path.join(dataset_dir, ext)))
                 if matches:
-                    return {"type": db_type_name, "path": matches[0]}
+                    # In some datasets like Yelp, the filename might be yelp_user.db
+                    # If we are looking for 'user_database', this is a good match.
+                    best_match = matches[0]
+                    target_low = db_id.lower().replace("_database", "").replace("_db", "")
+                    
+                    # Force duckdb for known duckdb datasets even if extension is .db
+                    if any(x in dataset_dir.lower() for x in ("yelp", "stockmarket", "stockindex", "crmarenapro", "music_brainz", "deps_dev", "github")):
+                        db_type_name = "duckdb"
+
+                    for m in matches:
+                        if target_low in os.path.basename(m).lower():
+                            best_match = m
+                            break
+                    return {"type": db_type_name, "path": best_match}
 
         # 4. Known HTTP-toolbox datasets (no direct connections — toolbox handles the routing)
         if db_id in _MONGODB_DATASETS:
@@ -394,6 +437,12 @@ class OracleForgeAgent:
         """
         Process a DAB benchmark question and return the DAB output format.
 
+        In agentic mode (default): delegates to AgenticLoop which lets the LLM
+        drive every iteration — inspect schema, run queries, adapt, and answer.
+
+        In structured mode (agent_mode=False): uses the pre-planned QueryRouter
+        pipeline with SelfCorrectionLoop (3 retries).
+
         Args:
             dab_input: {"question": str, "available_databases": List[str], "schema_info": dict}
 
@@ -402,6 +451,7 @@ class OracleForgeAgent:
         """
         question = dab_input["question"]
         available_databases = dab_input.get("available_databases") or list(self._db_configs.keys())
+        hints = dab_input.get("hints", "")
 
         # Auto-discover connection configs for any unknown dataset names
         self._resolve_missing_db_configs(available_databases)
@@ -422,9 +472,6 @@ class OracleForgeAgent:
         correction_applied_proactively = len(prior_corrections) > 0
 
         # Layer 2 on-demand: inject domain docs triggered by question keywords.
-        # get_docs_for_question() matches trigger words (revenue, table, schema, …)
-        # and loads the relevant kb/domain/ files.  We augment without mutating
-        # the shared bundle so the next query starts with a clean base.
         on_demand_docs = self._ctx_manager.get_docs_for_question(question)
         if on_demand_docs:
             context = _dc_replace(
@@ -432,6 +479,18 @@ class OracleForgeAgent:
                 institutional_knowledge=context.institutional_knowledge + on_demand_docs,
             )
 
+        # ── Agentic mode (default): LLM drives every step ──────────────────
+        if self._agent_mode:
+            return self._agentic_fallback(
+                question=question,
+                available_databases=available_databases,
+                context=context,
+                prior_corrections=prior_corrections,
+                correction_applied_proactively=correction_applied_proactively,
+                hints=hints,
+            )
+
+        # ── Structured mode: pre-planned QueryRouter pipeline ──────────────
         # Route: produce a QueryPlan
         plan = self._router.route(question, context, available_databases)
 
@@ -507,6 +566,119 @@ class OracleForgeAgent:
             "correction_applied": final_correction_applied,
         }
 
+    # ── Agentic fallback ──────────────────────────────────────────────────────
+
+    def _agentic_fallback(
+        self,
+        question: str,
+        available_databases: List[str],
+        context: Any,
+        prior_corrections: list,
+        correction_applied_proactively: bool,
+        hints: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Run the DAB-runner-style agentic loop for this question.
+
+        Builds schema context from the ContextBundle, runs AgenticLoop.run(),
+        then converts AgenticResult → DAB output format.
+        """
+        schema_context = build_schema_context(context.schema)
+
+        # Build Layer 2 KB context: join keys, SQL conventions, domain terms, etc.
+        # This gives the LLM the same domain knowledge the structured pipeline injects.
+        kb_docs = context.institutional_knowledge or []
+        kb_parts = [doc.content for doc in kb_docs if doc.content]
+        # Append relevant Layer 3 corrections so the LLM avoids known past mistakes
+        if prior_corrections:
+            corrections_text = "\n".join(
+                f"- [{c.database}] {c.query}: {c.failure_cause} → {c.correction}"
+                for c in prior_corrections
+            )
+            kb_parts.append(f"Prior corrections for similar queries:\n{corrections_text}")
+        kb_context = "\n\n---\n\n".join(kb_parts)
+        if hints:
+            kb_context += "\n\n---\nDomain Hints:\n" + hints
+
+        loop = AgenticLoop(
+            toolbox=self._toolbox,
+            db_configs=self._db_configs,
+            client=self._client,
+            schema_context=schema_context,
+            kb_context=kb_context,
+            max_iterations=self._max_iterations,
+            sandbox_client=self._sandbox_client,
+        )
+        result: AgenticResult = loop.run(question, available_databases)
+
+        # Convert termination reason to confidence score
+        if result.terminate_reason == "return_answer":
+            confidence = 0.85
+        elif result.terminate_reason == "no_tool_call":
+            confidence = 0.5
+        else:  # max_iterations
+            confidence = 0.2
+
+        answer = result.answer if result.answer else "Unable to determine answer."
+
+        # Build a minimal trace from the agentic loop steps
+        query_trace = [
+            {
+                "step": i + 1,
+                "db": step.get("input", {}).get("database", "?"),
+                "query": step.get("input", {}).get("query", ""),
+                "tool": step.get("tool", ""),
+                "result": step.get("output", "")[:200],
+                "error": None if step.get("success") else step.get("output", ""),
+                "correction_applied": False,
+            }
+            for i, step in enumerate(result.trace)
+        ]
+
+        # Log recovered errors back into Layer 3 Knowledge Base
+        if result.terminate_reason == "return_answer":
+            for i in range(len(result.trace) - 1):
+                step = result.trace[i]
+                # If a step failed but the immediate next step succeeded with the same tool, log it!
+                if not step.get("success"):
+                    next_step = result.trace[i + 1]
+                    if next_step.get("success") and next_step.get("tool") == step.get("tool"):
+                        tool = step.get("tool", "")
+                        good_input = next_step.get("input", {}).get("query", next_step.get("input", {}).get("code", ""))
+                        error_msg = step.get("output", "")
+                        err_tail = error_msg.splitlines()[-1] if error_msg else "Unknown failure"
+                        db = step.get("input", {}).get("database", "sandbox")
+                        
+                        self._ctx_manager.log_correction(
+                            query=question,
+                            failure_cause=f"{tool} exception: {err_tail}",
+                            correction=f"Corrected {tool} payload:\n{good_input}",
+                            database=db,
+                            root_cause=f"agentic_runtime_error",
+                            outcome="verified successful",
+                        )
+
+        # Update session history
+        self._sessions.setdefault(self._session_id, []).append(
+            {
+                "question": question,
+                "answer": answer,
+                "confidence": confidence,
+                "correction_applied": False,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+
+        return {
+            "answer": answer,
+            "query_trace": query_trace,
+            "confidence": confidence,
+            "tool_call_ids": [],
+            "correction_applied": correction_applied_proactively,
+            "terminate_reason": result.terminate_reason,
+            "iterations": result.iterations,
+        }
+
     # ── Answer synthesis (task 10.2) ──────────────────────────────────────────
 
     def _synthesise_answer(
@@ -568,7 +740,6 @@ class OracleForgeAgent:
         )
 
         response = self._client.messages.create(
-            model="claude-sonnet-4-6",
             max_tokens=512,
             temperature=0,
             messages=[{"role": "user", "content": prompt}],

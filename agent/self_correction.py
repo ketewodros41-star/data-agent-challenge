@@ -1006,7 +1006,6 @@ class SelfCorrectionLoop:
         )
         try:
             response = self._client.messages.create(
-                model="claude-sonnet-4-6",
                 max_tokens=512,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}],
@@ -1044,7 +1043,6 @@ class SelfCorrectionLoop:
         )
         try:
             response = self._client.messages.create(
-                model="claude-sonnet-4-6",
                 max_tokens=512,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}],

@@ -154,7 +154,7 @@ Optional for live natural-language runs that call the external LLM backend:
 
 ```env
 OPENROUTER_API_KEY=your-openrouter-key
-OPENROUTER_MODEL=google/gemini-2.5-flash-lite
+OPENROUTER_MODEL=google/gemini-3.1-pro-preview
 ```
 
 The local test suite does not require `OPENROUTER_API_KEY`.

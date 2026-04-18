@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+
+# Install system deps you may need (optional)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python libs
+RUN pip install --no-cache-dir pandas pyarrow rapidfuzz numpy

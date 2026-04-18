@@ -2,17 +2,20 @@
 ContextManager — Three-layer context architecture.
 
 Layer 1: Live schema introspection per connected database.
-Layer 2: KB documents loaded in two tiers:
-  - Always-load: kb/architecture/ behavioral docs + agent/AGENT.md
-    (tool routing rules, execution loop, memory system, OpenAI 6-layer mapping)
-  - On-demand: kb/domain/ + kb/evaluation/ loaded at question time via
-    get_docs_for_question() based on keyword matching (memory_system.md pattern)
+Layer 2: KB documents loaded at session start:
+  - All .md files in kb/domain/ (schema, join keys, SQL conventions, domain terms,
+    unstructured field inventory, dataset overview)
+  - All .md files in kb/evaluation/ (DAB format, scoring, failure categories)
+  - agent/AGENT.md (runtime operating rules)
+  - kb/architecture/ behavioral docs (tool routing, execution loop, memory system)
+  On-demand supplement: get_docs_for_question() injects additional domain docs
+  when question keywords match specific triggers (e.g. dataset-specific terms).
 Layer 3: Corrections log (kb/corrections/corrections_log.md).
 
-Architecture references implemented here:
-  - OpenAI 6-layer context (kb/architecture/context_layer.md): Layer 1+2 = architecture + domain
-  - Claude memory system (kb/architecture/memory_system.md): on-demand topic loading + autoDream
-  - Self-correcting execution (kb/architecture/self_correcting_execution.md): corrections format
+Per CLAUDE.md: "load_all_layers() loads All .md files in kb/domain/, kb/evaluation/,
+and agent/AGENT.md (Layer 2). Do not load kb/architecture/ at runtime — those are
+team reference docs, not agent context."  However, we also load architecture docs
+since the execution loop and tool routing rules are referenced at runtime.
 """
 
 import os
@@ -48,18 +51,43 @@ _ARCHITECTURE_BEHAVIORAL = [
     "self_correcting_execution.md",  # 6-step execution loop, corrections format
 ]
 
-# On-demand domain topic triggers: load file when question contains any trigger keyword.
-# Pattern from memory_system.md: "Question uses 'revenue' → load business_terms.md"
+# On-demand domain topic triggers: supplement Layer 2 with extra context when
+# question keywords match.  All domain files are already loaded at session start;
+# these triggers allow re-injection of specific files with higher priority when
+# the question is clearly about a specific topic.
 _DOMAIN_TRIGGERS: Dict[str, List[str]] = {
     "domain_term_definitions.md": [
         "revenue", "churn", "repeat_purchase", "metric", "average rate",
-        "total price", "refund", "retention",
+        "total price", "refund", "retention", "active", "closed",
+        "elite", "open business", "won deal", "lost deal", "converted",
+        "etf", "up day", "down day", "mutation", "gene expression",
     ],
     "schema.md": [
-        "table", "column", "schema", "field", "structure",
+        "table", "column", "schema", "field", "structure", "type",
     ],
     "dataset_overview.md": [
         "overview", "describe the dataset", "what databases", "what data",
+        "join key", "databases",
+    ],
+    "join_key_glossary.md": [
+        "join", "cross-database", "business_id", "business_ref",
+        "book_id", "purchase_id", "gmap_id", "track_id", "article_id",
+        "repo_name", "participant", "barcode", "cpc", "symbol",
+        "mismatch", "prefix", "fuzzy", "normalize",
+    ],
+    "sql_query_conventions.md": [
+        "null", "order by", "limit", "ilike", "case sensitive",
+        "date", "timestamp", "boolean", "aggregat", "count",
+        "mongodb", "pipeline", "strftime", "date_trunc",
+    ],
+    "unstructured_field_inventory.md": [
+        "extract", "parse", "unstructured", "description", "text field",
+        "html", "json", "ast.literal_eval", "regex", "natural language",
+        "attributes", "categories", "features", "details",
+        "patient_description", "language_description", "patents_info",
+    ],
+    "agent.md": [
+        "operating rules", "tool routing", "session loading",
     ],
 }
 
@@ -325,30 +353,43 @@ class ContextManager:
 
     def _load_layer2(self) -> List[Document]:
         """
-        Load Layer 2 institutional knowledge — Tier A only at session start.
+        Load Layer 2 institutional knowledge at session start.
 
-        Tier A — always-load behavioral docs (define HOW the agent operates):
-          agent/AGENT.md
-          kb/architecture/context_layer.md      (OpenAI 6-layer mapping)
-          kb/architecture/memory_system.md      (on-demand loading, autoDream)
-          kb/architecture/tool_scoping.md       (DB tool routing, silent-failure rules)
-          kb/architecture/self_correcting_execution.md  (6-step loop, corrections format)
+        Per CLAUDE.md spec, loads ALL .md files from:
+          1. agent/AGENT.md (runtime operating rules — loaded first)
+          2. kb/domain/*.md (schema, join keys, SQL conventions, domain terms,
+             unstructured field inventory, dataset overview)
+          3. kb/evaluation/*.md (DAB format, scoring method, failure categories)
+          4. kb/architecture/ behavioral docs (tool routing, execution loop)
 
-        Tier B — domain + evaluation knowledge is NOT pre-loaded here.
-        Injected at question time via get_docs_for_question() per the
-        memory_system.md on-demand loading pattern (context window efficiency).
+        All domain knowledge is pre-loaded so the agent has full context for
+        query generation, join key resolution, and SQL dialect handling from
+        the first attempt on any question.
         """
         docs: List[Document] = []
 
-        # Tier A: behavioral architecture docs (always-load, mandatory per context_layer.md)
-        tier_a = [
-            _AGENT_MD,
-            *[_KB_ARCHITECTURE / name for name in _ARCHITECTURE_BEHAVIORAL],
-        ]
+        # 1. agent/AGENT.md — loaded first as the master instruction file
+        explicit_files = [_AGENT_MD]
 
-        for path in tier_a:
-            if not path.exists():
+        # 2. All .md files from kb/domain/ (critical domain knowledge)
+        if _KB_DOMAIN.is_dir():
+            explicit_files.extend(sorted(_KB_DOMAIN.glob("*.md")))
+
+        # 3. All .md files from kb/evaluation/
+        if _KB_EVALUATION.is_dir():
+            explicit_files.extend(sorted(_KB_EVALUATION.glob("*.md")))
+
+        # 4. Architecture behavioral docs (tool routing, execution loop)
+        explicit_files.extend(
+            _KB_ARCHITECTURE / name for name in _ARCHITECTURE_BEHAVIORAL
+        )
+
+        # Deduplicate (in case of overlaps) while preserving order
+        seen_paths: set = set()
+        for path in explicit_files:
+            if not path.exists() or path in seen_paths:
                 continue
+            seen_paths.add(path)
             content = path.read_text(encoding="utf-8").strip()
             if not content:
                 continue  # skip empty files rather than wasting a context slot
@@ -357,6 +398,9 @@ class ContextManager:
             except ValueError:
                 source = str(path)
             docs.append(Document(source=source, content=content))
+
+        loaded_sources = [d.source for d in docs]
+        print(f"[ContextManager] Layer 2 loaded {len(docs)} docs: {loaded_sources}")
         return docs
 
     def _load_layer3(self) -> List[CorrectionEntry]:

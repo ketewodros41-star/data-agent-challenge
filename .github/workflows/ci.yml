@@ -2,9 +2,14 @@ name: CI
 
 on:
   push:
-    branches: 
+    branches:
       - main
+      - feat/agent
   pull_request:
+    branches:
+      - main
+      - feat/agent
+
 
 jobs:
   test:

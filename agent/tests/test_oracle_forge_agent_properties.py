@@ -121,7 +121,7 @@ def _make_agent(answer_value: Any = "42", success: bool = True):
         patch("agent.oracle_forge_agent.ExecutionEngine", return_value=MagicMock()),
         patch("agent.oracle_forge_agent.SelfCorrectionLoop", return_value=mock_scl),
     ):
-        agent = OracleForgeAgent(db_configs={"postgres": {"type": "postgres", "connection_string": ""}})
+        agent = OracleForgeAgent(db_configs={"postgres": {"type": "postgres", "connection_string": ""}}, agent_mode=False)
 
     # Reattach the mocked sub-components so tests can inspect call counts etc.
     agent._ctx_manager = mock_ctx
@@ -306,7 +306,8 @@ def test_property_confidence_monotone_in_success(
         MockCM.return_value = mock_ctx
 
         agent = OracleForgeAgent(
-            db_configs={"postgres": {"type": "postgres", "connection_string": ""}}
+            db_configs={"postgres": {"type": "postgres", "connection_string": ""}},
+            agent_mode=False
         )
 
     # Build a plan with n_databases distinct databases
@@ -381,7 +382,8 @@ def test_property_confidence_always_in_valid_range(
         MockCM.return_value = mock_ctx
 
         agent = OracleForgeAgent(
-            db_configs={"postgres": {"type": "postgres", "connection_string": ""}}
+            db_configs={"postgres": {"type": "postgres", "connection_string": ""}},
+            agent_mode=False
         )
 
     db_names = (_DB_NAMES * 4)[:max(1, n_databases)]

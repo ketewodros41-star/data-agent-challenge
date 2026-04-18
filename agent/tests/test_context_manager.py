@@ -259,9 +259,10 @@ def test_load_layer2_reads_kb_docs(tmp_path, monkeypatch):
 
     cm = ContextManager(databases={})
     docs = cm._load_layer2()
-    # Tier A transition: architecture docs are pre-loaded; Tier B (domain) are on-demand only.
+    # All kb/domain/ and kb/evaluation/ .md files are loaded at session start,
+    # along with agent/AGENT.md and architecture behavioral docs.
     assert any("Agent context" in d.content for d in docs)
-    assert not any("Test" in d.content for d in docs)
+    assert any("Test" in d.content for d in docs)  # domain doc loaded at session start
 
 
 def test_load_layer2_missing_agent_md(tmp_path, monkeypatch):

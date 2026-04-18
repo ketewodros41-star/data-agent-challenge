@@ -125,7 +125,7 @@ def _build_agent(
         patch("agent.oracle_forge_agent.ExecutionEngine", return_value=MagicMock()),
         patch("agent.oracle_forge_agent.SelfCorrectionLoop", return_value=mock_scl),
     ):
-        agent = OracleForgeAgent(db_configs=_MIN_DB_CONFIGS)
+        agent = OracleForgeAgent(db_configs=_MIN_DB_CONFIGS, agent_mode=False)
 
     # Reattach mocks so tests can inspect them post-construction
     agent._client = mock_client

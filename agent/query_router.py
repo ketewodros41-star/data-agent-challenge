@@ -33,7 +33,9 @@ from agent.models.models import (
 from utils.join_key_resolver import resolve_join_keys
 
 _REPO_ROOT = Path(__file__).parent.parent
-_UNSTRUCTURED_FIELDS_FILE = _REPO_ROOT / "kb" / "domain" / "unstructured_fields.md"
+_UNSTRUCTURED_FIELDS_FILE = _REPO_ROOT / "kb" / "domain" / "unstructured_field_inventory.md"
+_JOIN_KEY_GLOSSARY_FILE = _REPO_ROOT / "kb" / "domain" / "join_key_glossary.md"
+_SQL_CONVENTIONS_FILE = _REPO_ROOT / "kb" / "domain" / "sql_query_conventions.md"
 
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,8 @@ class QueryRouter:
     def __init__(self, client: Optional[LLMClient] = None):
         self._client = client or LLMClient()
         self._unstructured_fields = _load_unstructured_fields()
+        self._join_key_glossary = _load_join_key_glossary()
+        self._sql_conventions = _load_sql_conventions()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -309,7 +313,6 @@ class QueryRouter:
         )
         try:
             response = self._client.messages.create(
-                model="claude-sonnet-4-6",
                 max_tokens=256,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}],
@@ -501,6 +504,21 @@ class QueryRouter:
                 if confirmed_tables else ""
             )
 
+            # Inject SQL conventions for SQL dialects to prevent common errors
+            sql_conventions_note = ""
+            if dialect != QueryDialect.MONGODB and self._sql_conventions:
+                sql_conventions_note = (
+                    f"SQL Query Conventions (MUST follow):\n{self._sql_conventions}\n\n"
+                )
+
+            # Inject join key glossary when multiple databases are involved
+            join_key_note = ""
+            if len(db_assignments) > 1 and self._join_key_glossary:
+                join_key_note = (
+                    f"Join Key Glossary (check before any cross-database join):\n"
+                    f"{self._join_key_glossary}\n\n"
+                )
+
             prompt = (
                 f"Generate a {dialect.value} query to answer this question using only the "
                 f"{db_name} database.\n\n"
@@ -510,13 +528,14 @@ class QueryRouter:
                 f"{discovery_note}"
                 f"Schema:\n{schema_text}\n\n"
                 + (f"{dialect_hint}\n\n" if dialect_hint else "")
+                + sql_conventions_note
+                + join_key_note
                 + f"Domain knowledge:\n{kb_text}\n\n"
                 + (f"Known corrections:\n{correction_text}\n\n" if correction_text else "")
                 + "Return ONLY the raw query string, no explanation."
             )
 
             response = self._client.messages.create(
-                model="claude-sonnet-4-6",
                 max_tokens=1024,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}],
@@ -590,12 +609,40 @@ def _format_schema(schema_info: Any) -> str:
 
 
 def _load_unstructured_fields() -> Set[str]:
+    """
+    Parse unstructured_field_inventory.md to extract field names.
+
+    The file uses markdown tables with backtick-quoted field names:
+      | `description` | business (MongoDB) | yelp_db | NL text ... |
+    We extract the field name from the first column of each data row.
+    """
     if not _UNSTRUCTURED_FIELDS_FILE.exists():
         return set()
     text = _UNSTRUCTURED_FIELDS_FILE.read_text(encoding="utf-8")
     fields: Set[str] = set()
     for line in text.splitlines():
-        stripped = line.strip().lstrip("-").strip()
-        if stripped and not stripped.startswith("#"):
-            fields.add(stripped.lower())
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        # Skip header and separator rows
+        if stripped.startswith("| Field") or stripped.startswith("|---"):
+            continue
+        # Extract backtick-quoted field names from first column: | `field_name` |
+        match = re.search(r"\|\s*`([^`]+)`", stripped)
+        if match:
+            fields.add(match.group(1).lower())
     return fields
+
+
+def _load_join_key_glossary() -> str:
+    """Load join key glossary content for injection into cross-DB query prompts."""
+    if not _JOIN_KEY_GLOSSARY_FILE.exists():
+        return ""
+    return _JOIN_KEY_GLOSSARY_FILE.read_text(encoding="utf-8")
+
+
+def _load_sql_conventions() -> str:
+    """Load SQL query conventions for injection into query generation prompts."""
+    if not _SQL_CONVENTIONS_FILE.exists():
+        return ""
+    return _SQL_CONVENTIONS_FILE.read_text(encoding="utf-8")

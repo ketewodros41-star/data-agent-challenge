@@ -70,6 +70,18 @@
 7. **QUERY TRACE** — Every answer must include: databases queried, tools called,
    join keys used, any corrections applied, confidence level (high/medium/low).
 
+8. **OPPORTUNITY STAGE IDENTIFICATION (crmarenapro)** — When asked what stage an opportunity SHOULD be in based on its tasks/activities:
+   - Read ALL Task subjects/descriptions linked to the Opportunity via `WhatId`.
+   - Map task keywords → pipeline stage using the activity-to-stage mapping in `domain_term_definitions.md` → crmarenapro → Stage Identification section.
+   - The current `StageName` on the Opportunity may be WRONG — the question asks what it SHOULD be.
+   - Answer labels like 'Negotiation' map to Salesforce's 'Negotiation/Review'; 'Quote' maps to 'Proposal/Price Quote'.
+
+9. **BANT QUALIFICATION (crmarenapro)** — When answering BANT lead qualification questions:
+   - A factor FAILS only with **explicit, direct evidence** from the transcript. Uncertainty or silence = PASS.
+   - Read `domain_term_definitions.md` → crmarenapro → BANT section for exact failure criteria per factor.
+   - Return the **minimum set** of factors with clear failure evidence. Over-reporting is penalised.
+   - Evidence must come from voice call transcripts (`LiveChatTranscript` or `VoiceCallTranscript`) joined to the Lead Id — not from assumptions about the lead record alone.
+
 ---
 
 ## Session Loading Order

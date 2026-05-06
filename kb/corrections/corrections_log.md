@@ -399,131 +399,51 @@ print(env.keys())
 [Query]      Is there a particular month in the past 10 months where the number of SecureAnalytics Pro cases significantly exceeds those of other months? The associated product Id is 01tWt000006hVJdIAM. Return only the month name.
 
 - Today's date: 2021-04-10
+[Query]      Which decade of publication (e.g., 1980s) has the highest average rating among decades with at least 10 distinct books that have been rated? Return the decade with the highest average rating.
+[Failure]    execute_python exception: KeyError: 'data_8'
+[Root Cause] agentic_runtime_error
+[Fix]        Corrected execute_python payload:
+print(list(env.keys()))
+[Outcome]    verified successful
+[db=sandbox] [2026-04-18T15:43:08.673197]
+---
+
+[Query]      Which English-language books in the 'Literature & Fiction' category have a perfect average rating of 5.0? Return all matching books.
+[Failure]    execute_python exception:   File "pandas/_libs/hashtable_class_helper.pxi", line 7668, in pandas._libs.hasht
+[Root Cause] agentic_runtime_error
+[Fix]        Corrected execute_python payload:
+import pandas as pd
+reviews_df = pd.DataFrame(env['data_2'])
+print(reviews_df.columns)
+
+[Outcome]    verified successful
+[db=sandbox] [2026-04-18T15:49:30.098034]
+---
+
+[Query]      Which books categorized as 'Children's Books' have received an average rating of at least 4.5 based on reviews from 2020 onwards?
 [Failure]    execute_python exception:   File "pandas/_libs/hashtable_class_helper.pxi", line 7668, in pandas._libs.hasht
 [Root Cause] agentic_runtime_error
 [Fix]        Corrected execute_python payload:
 import pandas as pd
 
-cases = pd.DataFrame(env['data_2'])
-print(cases.columns)
+books = env['data_2']
+reviews = env['data_3']
+
+df_books = pd.DataFrame(books)
+df_reviews = pd.DataFrame(reviews)
+
+print("Books columns:", df_books.columns)
+print("Reviews columns:", df_reviews.columns)
 
 [Outcome]    verified successful
-[db=sandbox] [2026-04-17T23:50:57.408071]
+[db=sandbox] [2026-04-18T16:00:24.804980]
 ---
 
-[Query]      Is there a particular month in the past 10 months where the number of SecureAnalytics Pro cases significantly exceeds those of other months? The associated product Id is 01tWt000006hVJdIAM. Return only the month name.
-
-- Today's date: 2021-04-10
-[Failure]    execute_python exception: KeyError: 'data_5'
-[Root Cause] agentic_runtime_error
-[Fix]        Corrected execute_python payload:
-import pandas as pd
-
-# Load data
-order_items = pd.DataFrame(env['data_1'])
-cases = pd.DataFrame(env['data_4'])
-
-# Clean IDs
-order_items['Id'] = order_items['Id'].str.replace('#', '').str.strip()
-cases['orderitemid__c'] = cases['orderitemid__c'].str.replace('#', '').str.strip()
-
-# Merge
-merged = pd.merge(cases, order_items, left_on='orderitemid__c', right_on='Id', how='inner')
-
-# Extract month
-merged['createddate'] = pd.to_datetime(merged['createddate'])
-merged['month'] = merged['createddate'].dt.month_name()
-
-# Count cases per month
-counts = merged['month'].value_counts()
-print(counts)
-
-[Outcome]    verified successful
-[db=sandbox] [2026-04-17T23:50:57.408296]
----
-
-[Query]      Is there a particular month in the past 10 months where the number of SecureAnalytics Pro cases significantly exceeds those of other months? The associated product Id is 01tWt000006hVJdIAM. Return only the month name.
-
-- Today's date: 2021-04-10
-[Failure]    execute_python exception: KeyError: 'data_6'
-[Root Cause] agentic_runtime_error
-[Fix]        Corrected execute_python payload:
-import pandas as pd
-
-# Load data
-order_items = pd.DataFrame(env['data_1'])
-cases = pd.DataFrame(env['data_5'])
-
-# Clean IDs
-order_items['Id'] = order_items['Id'].str.replace('#', '').str.strip()
-cases['orderitemid__c'] = cases['orderitemid__c'].str.replace('#', '').str.strip()
-
-# Merge
-merged = pd.merge(cases, order_items, left_on='orderitemid__c', right_on='Id', how='inner')
-
-# Extract month
-merged['createddate'] = pd.to_datetime(merged['createddate'])
-merged['month'] = merged['createddate'].dt.month_name()
-
-# Count cases per month
-counts = merged['month'].value_counts()
-print(counts)
-
-[Outcome]    verified successful
-[db=sandbox] [2026-04-17T23:50:57.408368]
----
-
-[Query]      Is there a particular month in the past 10 months where the number of SecureAnalytics Pro cases significantly exceeds those of other months? The associated product Id is 01tWt000006hVJdIAM. Return only the month name.
-
-- Today's date: 2021-04-10
-[Failure]    execute_python exception: KeyError: 'data_7'
-[Root Cause] agentic_runtime_error
-[Fix]        Corrected execute_python payload:
-import pandas as pd
-
-# Load data
-order_items = pd.DataFrame(env['data_1'])
-cases = pd.DataFrame(env['data_6'])
-
-# Clean IDs
-order_items['Id'] = order_items['Id'].str.replace('#', '').str.strip()
-cases['orderitemid__c'] = cases['orderitemid__c'].str.replace('#', '').str.strip()
-
-# Merge
-merged = pd.merge(cases, order_items, left_on='orderitemid__c', right_on='Id', how='inner')
-
-# Extract month
-merged['createddate'] = pd.to_datetime(merged['createddate'])
-merged['month'] = merged['createddate'].dt.month_name()
-
-# Count cases per month
-counts = merged['month'].value_counts()
-print(counts)
-
-[Outcome]    verified successful
-[db=sandbox] [2026-04-17T23:50:57.408421]
----
-
-[Query]      What has been the most frequent problem AI Cirku-Tech encountered over the past five months? The associated product Id is 01tWt000006hV8LIAU. Return only the issue Id of the most reported issue for this product.
-
-- Today's date: 2023-01-16
-[Failure]    execute_python exception: NameError: name 'cases' is not defined
-[Root Cause] agentic_runtime_error
-[Fix]        Corrected execute_python payload:
-import pandas as pd
-cases = pd.DataFrame(env['data_15'])
-print(cases.columns)
-[Outcome]    verified successful
-[db=sandbox] [2026-04-18T00:00:08.633728]
----
-
-[Query]      What has been the most frequent problem AI Cirku-Tech encountered over the past five months? The associated product Id is 01tWt000006hV8LIAU. Return only the issue Id of the most reported issue for this product.
-
-- Today's date: 2023-01-16
-[Failure]    execute_python exception: KeyError: 'data_20'
+[Query]      Which books categorized as 'Children's Books' have received an average rating of at least 4.5 based on reviews from 2020 onwards?
+[Failure]    execute_python exception: KeyError: 'data_8'
 [Root Cause] agentic_runtime_error
 [Fix]        Corrected execute_python payload:
 print(env.keys())
 [Outcome]    verified successful
-[db=sandbox] [2026-04-18T00:00:08.633960]
+[db=sandbox] [2026-04-18T16:00:24.805502]
 ---

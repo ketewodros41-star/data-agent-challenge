@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockmarket",
+  "query": "query3",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "validate.py raised ModuleNotFoundError: No module named 'common_scaffold'",
+  "llm_answer": "Unable to determine answer.",
+  "ground_truth": "Apex Global Brands Inc,23781.42\nBIO-key International, Inc,10988.14\nCBAK Energy Technology, Inc,86223.32\nChina Ceramics Co, Ltd,4366.80\nCorrevio Pharma Corp,145247.83\nCounterPath Corporation,375.49\nDASAN Zhone Solutions, Inc,15578.66\nFuture FinTech Group Inc,9.85\nFrontier Communications Corporation,254397.63\nIdeanomics, Inc,10.28\nOcean Power Technologies, Inc,254.15\nPacific Ethanol, Inc,10706.72\nSynthesis Energy Systems, Inc,2390.51\nSunesis Pharmaceuticals, Inc,781.82\nSypris Solutions, Inc,36836.36",
+  "terminate_reason": "max_iterations",
+  "duration": 668.1441829204559,
+  "iterations": 150
+}

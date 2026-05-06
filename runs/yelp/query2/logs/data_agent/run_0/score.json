@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query2",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "Found: name='PA', value\u22483.7",
+  "llm_answer": "[\"PA\", 3.699395770392749]",
+  "ground_truth": "PA,3.699395770392749",
+  "terminate_reason": "return_answer",
+  "duration": 13.929518938064575,
+  "iterations": 3
+}

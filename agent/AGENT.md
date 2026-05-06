@@ -73,6 +73,13 @@
 7. **QUERY TRACE** — Every answer must include: databases queried, tools called,
    join keys used, any corrections applied, confidence level (high/medium/low).
 
+8. **PYTHON INTEGRITY** — When using `execute_python` to merge cross-database results:
+   - **Check Keys:** Always start scripts by checking `env.keys()` to avoid `KeyErrors`.
+   - **Self-Contained:** Every script MUST import its own modules (e.g., `import pandas as pd`, `import re`).
+   - **Chunking:** If fetching metadata for >500 IDs, use SQL `IN` clauses in batches to avoid 2MB response limits.
+   - **Bulk First:** Perform deduplication (merging names/artists) in Python for ALL initial candidates at once. **Never** enter a loop that verifies one song per tool call; this hits iteration limits. Deep-dive into candidates only after bulk pruning.
+
+
 
 ---
 

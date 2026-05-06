@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockmarket",
+  "query": "query2",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "validate.py raised ModuleNotFoundError: No module named 'common_scaffold'",
+  "llm_answer": "Unable to determine answer",
+  "ground_truth": "ProShares Ultra Bloomberg Natural Gas\nProShares UltraShort MSCI Brazil Capped\nDirexion Auspice Broad Commodity Strategy ETF\nDirexion Daily Gold Miners Index Bear 2X Shares\nDirexion Emerging Markets Bear 3X Shares\nDirexion Energy Bull 2X Shares\nDirexion Financial Bear 3X Shares\nProShares Ultrashort FTSE China 50\nGoldman Sachs Motif Finance Reimagined ETF\nDirexion Daily S&P Oil & Gas Exp. & Prod. Bull 2X Shares\nXtrackers High Beta High Yield Bond ETF\nDirexion Daily Junior Gold Miners Index Bear 2X Shares\nDirexion Daily Junior Gold Miners Index Bull 2X Shares\nXtrackers Japan JPX-Nikkei 400 Equity ETF\nDirexion Daily S&P Biotech Bear 3X Shares\nDirexion Daily S&P Biotech Bull 3X Shares\nDirexion Daily Latin America 3x Bull Shares\nSPDR MidCap Trust Series I\nPacer Trendpilot International ETF\nPacer Benchmark Retail Real Estate SCTR ETF\nUltraPro Short Dow30\nDirexion Daily Semiconductor Bear 3x Shares\nProShares UltraShort Semiconductors\nDirexion Technology Bear 3X Shares\nDirexion Small Cap Bear 3X Shares\nProShares Trust Ultra VIX Short Term Futures ETF\nProShares Trust VIX Short-Term Futures ETF\nVirtus Private Credit Strategy ETF\nSPDR Series Trust SPDR S&P Oil & Gas Equipment & Services ETF\nSPDR S&P Oil & Gas Explor & Product\nDirexion Daily FTSE China Bear 3x Shares\nTotal: 31",
+  "terminate_reason": "return_answer",
+  "duration": 82.03259325027466,
+  "iterations": 16
+}

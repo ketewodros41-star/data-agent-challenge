@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "patents",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Missing CPC code: A22B",
+  "llm_answer": "Unable to determine answer",
+  "ground_truth": "cpc_group\nA22B\nA23J\nA23P\nA24D\nA24F\nA41G\nA47F\nA61P\nA62B\nA62D\nA63H\nB08B\nB09B\nB09C\nB24B\nB27C\nB27G\nB28D\nB30B\nB60H\nB60P\nB63G\nB65G\nC01D\nC01G\nC21B\nC25B\nE02D\nE04G\nE21D\nE21F\nF16M\nF17B\nF24D\nF25J\nF26B\nG01H\nG01L\nG05G\nG06J\nG06N\nG06T\nG06V\nG08G\nG16B\nG16C\nG16H\nG21F\nH02B\nH02G",
+  "terminate_reason": "return_answer",
+  "duration": 107.40437078475952,
+  "iterations": 20
+}

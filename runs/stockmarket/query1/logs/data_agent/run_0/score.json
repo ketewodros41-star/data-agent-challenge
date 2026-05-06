@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockmarket",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "No number found in LLM output.",
+  "llm_answer": "Unable to determine answer.",
+  "ground_truth": "18.440000534057617",
+  "terminate_reason": "max_iterations",
+  "duration": 431.5622968673706,
+  "iterations": 100
+}

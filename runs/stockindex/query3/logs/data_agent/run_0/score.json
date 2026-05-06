@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockindex",
+  "query": "query3",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Missing name: NSEI",
+  "llm_answer": "[{\"Index\": \"IXIC\", \"Country\": \"USA\"}, {\"Index\": \"NSEI\", \"Country\": \"India\"}, {\"Index\": \"399001.SZ\", \"Country\": \"China\"}, {\"Index\": \"GDAXI\", \"Country\": \"Germany\"}, {\"Index\": \"TWII\", \"Country\": \"Taiwan\"}]",
+  "ground_truth": "399001.SZ,China\nNSEI,India\nIXIC,United States\n000001.SS,China\nNYA,United States",
+  "terminate_reason": "return_answer",
+  "duration": 148.2411994934082,
+  "iterations": 27
+}

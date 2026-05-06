@@ -3,19 +3,21 @@ ContextManager — Three-layer context architecture.
 
 Layer 1: Live schema introspection per connected database.
 Layer 2: KB documents loaded at session start:
-  - All .md files in kb/domain/ (schema, join keys, SQL conventions, domain terms,
-    unstructured field inventory, dataset overview)
-  - All .md files in kb/evaluation/ (DAB format, scoring, failure categories)
   - agent/AGENT.md (runtime operating rules)
-  - kb/architecture/ behavioral docs (tool routing, execution loop, memory system)
-  On-demand supplement: get_docs_for_question() injects additional domain docs
-  when question keywords match specific triggers (e.g. dataset-specific terms).
+  - Small, dataset-agnostic docs from kb/domain/ (domain terms, join key
+    glossary, SQL conventions) via explicit allowlist.
+  - All .md files in kb/evaluation/ (DAB format, scoring, failure categories)
+  Dataset-scoped injection at answer() time:
+    - schema.md, dataset_overview.md, unstructured_field_inventory.md are
+      sliced to the sections relevant to the current `available_databases`
+      (see `get_dataset_scoped_docs`).  Fail-open: unknown dataset → full doc.
+  On-demand supplement: get_docs_for_question() injects additional docs when
+  question keywords match specific triggers.
 Layer 3: Corrections log (kb/corrections/corrections_log.md).
 
-Per CLAUDE.md: "load_all_layers() loads All .md files in kb/domain/, kb/evaluation/,
-and agent/AGENT.md (Layer 2). Do not load kb/architecture/ at runtime — those are
-team reference docs, not agent context."  However, we also load architecture docs
-since the execution loop and tool routing rules are referenced at runtime.
+Per CLAUDE.md: kb/architecture/ is team reference material and is NOT loaded at
+runtime.  Domain docs are loaded via an allowlist rather than a glob so that
+incidental files (CHANGELOG.MD, drafts) do not leak into the prompt.
 """
 
 import os
@@ -36,25 +38,33 @@ from utils.schema_introspector import introspect_schema
 
 # Paths relative to repo root
 _REPO_ROOT = Path(__file__).parent.parent
-_KB_ARCHITECTURE = _REPO_ROOT / "kb" / "architecture"
 _KB_DOMAIN = _REPO_ROOT / "kb" / "domain"
-_KB_EVALUATION = _REPO_ROOT / "kb" / "evaluation"
+# _KB_EVALUATION = _REPO_ROOT / "kb" / "evaluation"
 _CORRECTIONS_LOG = _REPO_ROOT / "kb" / "corrections" / "corrections_log.md"
 _AGENT_MD = _REPO_ROOT / "agent" / "AGENT.md"
 
-# Behavioral architecture docs always loaded at session start (define HOW the agent operates).
-# These are the mandatory Layer 1+2 docs per context_layer.md line 78.
-_ARCHITECTURE_BEHAVIORAL = [
-    "context_layer.md",          # OpenAI 6-layer mapping + discovery phase rules
-    "memory_system.md",          # on-demand loading, autoDream, MEMORY.md as index
-    "tool_scoping.md",           # which tool per DB, silent-failure prevention
-    "self_correcting_execution.md",  # 6-step execution loop, corrections format
+# Small, dataset-agnostic kb/domain/ files loaded at session start.
+# Dataset-partitioned files (schema.md, dataset_overview.md,
+# unstructured_field_inventory.md) are injected on-demand per query via
+# get_dataset_scoped_docs().
+_DOMAIN_ALWAYS_LOAD = [
+    "domain_term_definitions.md",
+    "join_key_glossary.md",
+    "sql_query_conventions.md",
 ]
 
-# On-demand domain topic triggers: supplement Layer 2 with extra context when
-# question keywords match.  All domain files are already loaded at session start;
-# these triggers allow re-injection of specific files with higher priority when
-# the question is clearly about a specific topic.
+# Files sliced per-dataset and injected at answer() time via
+# get_dataset_scoped_docs().  Each one partitions its body into per-dataset
+# `## ...` sections plus an optional preamble/trailing global sections.
+_DATASET_SCOPED_FILES = [
+    "dataset_overview.md",
+    "schema.md",
+    "unstructured_field_inventory.md",
+]
+
+# On-demand keyword triggers for the small always-loaded docs only.  Dataset-
+# scoped files are NOT listed here — scoping is handled uniformly by
+# get_dataset_scoped_docs() at answer() time to avoid double-injection.
 _DOMAIN_TRIGGERS: Dict[str, List[str]] = {
     "domain_term_definitions.md": [
         "revenue", "churn", "repeat_purchase", "metric", "average rate",
@@ -80,16 +90,13 @@ _DOMAIN_TRIGGERS: Dict[str, List[str]] = {
         "date", "timestamp", "boolean", "aggregat", "count",
         "mongodb", "pipeline", "strftime", "date_trunc",
     ],
-    "unstructured_field_inventory.md": [
-        "extract", "parse", "unstructured", "description", "text field",
-        "html", "json", "ast.literal_eval", "regex", "natural language",
-        "attributes", "categories", "features", "details",
-        "patient_description", "language_description", "patents_info",
-    ],
-    "agent.md": [
-        "operating rules", "tool routing", "session loading",
-    ],
 }
+
+# Regex matching `## N. dataset_name` headings in dataset_overview.md / schema.md
+_DATASET_HEADING_RE = re.compile(r"^##\s+\d+\.\s+(\S+)", re.MULTILINE)
+
+# Regex matching any level-2 heading `## Title` (for slicing; excludes `###`)
+_H2_RE = re.compile(r"^## (.+?)$", re.MULTILINE)
 
 # Loaded once per session, updated after each execution
 _BUNDLE: Optional[ContextBundle] = None
@@ -110,6 +117,11 @@ class ContextManager:
         self._databases = databases
         self._toolbox = toolbox
         self._bundle: Optional[ContextBundle] = None
+        # Lazily built from dataset_overview.md.  One db_id may map to more
+        # than one dataset (e.g. `review_database` exists in both googlelocal
+        # and bookreview), so we keep a list not a single value.
+        self._db_to_dataset: Optional[Dict[str, List[str]]] = None
+        self._all_datasets: Optional[List[str]] = None
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -164,9 +176,10 @@ class ContextManager:
         On-demand topic file loader (memory_system.md Layer 2 pattern).
 
         Returns domain docs from kb/domain/ whose trigger keywords appear in
-        the question.  Architecture behavioral docs are already in the bundle
-        (always-loaded); this method adds domain-specific context only when
-        it is relevant to the current question.
+        the question, EXCLUDING any doc whose source is already present in the
+        loaded bundle.  This prevents silent duplication when callers merge the
+        result into context.institutional_knowledge, because most trigger files
+        are also on the always-load allowlist (`_DOMAIN_ALWAYS_LOAD`).
 
         Trigger examples from memory_system.md:
           "revenue"         → domain_term_definitions.md
@@ -174,18 +187,98 @@ class ContextManager:
           "join"            → loaded automatically via join_key_resolver
         """
         question_lower = question.lower()
+        already_loaded = {
+            doc.source for doc in (self._bundle.institutional_knowledge if self._bundle else [])
+        }
         docs: List[Document] = []
         for filename, triggers in _DOMAIN_TRIGGERS.items():
             path = _KB_DOMAIN / filename
             if not path.exists():
                 continue
-            if any(t in question_lower for t in triggers):
-                try:
-                    source = str(path.relative_to(_REPO_ROOT))
-                except ValueError:
-                    source = str(path)
-                docs.append(Document(source=source, content=path.read_text(encoding="utf-8")))
+            if not any(t in question_lower for t in triggers):
+                continue
+            try:
+                source = str(path.relative_to(_REPO_ROOT))
+            except ValueError:
+                source = str(path)
+            if source in already_loaded:
+                continue
+            docs.append(Document(source=source, content=path.read_text(encoding="utf-8")))
         return docs
+
+    def get_dataset_scoped_docs(self, db_names: List[str]) -> List[Document]:
+        """
+        Return per-dataset slices of the large KB files (`schema.md`,
+        `dataset_overview.md`, `unstructured_field_inventory.md`) for the given
+        database ids.
+
+        Slicing rules:
+          - Preamble (text before first `## ` heading) is always kept.
+          - Each `## ` section whose heading contains any *known* dataset name
+            is treated as dataset-specific and kept only if that dataset is
+            in the requested set.
+          - `## ` sections whose heading does NOT match any known dataset are
+            treated as global and kept unconditionally (e.g.
+            "## SQL dialect quick notes", "## Summary: extraction library").
+
+        Fail-open: if no dataset names can be resolved (empty input, unknown
+        db ids, or dataset_overview.md is missing), the FULL file is returned.
+        This guarantees no context loss.
+        """
+        db_to_dataset = self._build_db_to_dataset_map()
+        all_datasets = set(self._all_datasets or [])
+        wanted: set = set()
+        for db in db_names:
+            wanted.update(db_to_dataset.get(db, []))
+        docs: List[Document] = []
+        for filename in _DATASET_SCOPED_FILES:
+            path = _KB_DOMAIN / filename
+            if not path.exists():
+                continue
+            text = path.read_text(encoding="utf-8")
+            sliced = _slice_doc_by_datasets(text, wanted, all_datasets) if wanted else text
+            try:
+                source = str(path.relative_to(_REPO_ROOT))
+            except ValueError:
+                source = str(path)
+            docs.append(Document(source=source, content=sliced))
+        return docs
+
+    def _build_db_to_dataset_map(self) -> Dict[str, List[str]]:
+        """Parse dataset_overview.md once to map db_id → list of dataset_names.
+
+        A db_id may belong to more than one dataset (e.g. `review_database`
+        appears under both googlelocal and bookreview).  We collect all
+        matches; the caller unions them to build the scoping set.
+        """
+        if self._db_to_dataset is not None:
+            return self._db_to_dataset
+        result: Dict[str, List[str]] = {}
+        all_datasets: List[str] = []
+        overview_path = _KB_DOMAIN / "dataset_overview.md"
+        if not overview_path.exists():
+            self._db_to_dataset = result
+            self._all_datasets = all_datasets
+            return result
+        text = overview_path.read_text(encoding="utf-8")
+        headings = list(_DATASET_HEADING_RE.finditer(text))
+        row_re = re.compile(r"^\|\s*([A-Za-z][A-Za-z0-9_]*)\s*\|", re.MULTILINE)
+        for idx, match in enumerate(headings):
+            dataset_name = match.group(1).lower()
+            all_datasets.append(dataset_name)
+            start = match.start()
+            end = headings[idx + 1].start() if idx + 1 < len(headings) else len(text)
+            section = text[start:end]
+            for row in row_re.finditer(section):
+                db_id = row.group(1).strip()
+                if db_id.lower() in ("database", "db", "databases"):
+                    continue
+                datasets = result.setdefault(db_id, [])
+                if dataset_name not in datasets:
+                    datasets.append(dataset_name)
+        self._db_to_dataset = result
+        self._all_datasets = all_datasets
+        return result
 
     def get_similar_corrections(self, query: str) -> List[CorrectionEntry]:
         """Return corrections whose query text overlaps with the given query.
@@ -355,34 +448,27 @@ class ContextManager:
         """
         Load Layer 2 institutional knowledge at session start.
 
-        Per CLAUDE.md spec, loads ALL .md files from:
+        Loads, in order:
           1. agent/AGENT.md (runtime operating rules — loaded first)
-          2. kb/domain/*.md (schema, join keys, SQL conventions, domain terms,
-             unstructured field inventory, dataset overview)
+          2. kb/domain/ files from _DOMAIN_ALWAYS_LOAD allowlist
           3. kb/evaluation/*.md (DAB format, scoring method, failure categories)
-          4. kb/architecture/ behavioral docs (tool routing, execution loop)
 
-        All domain knowledge is pre-loaded so the agent has full context for
-        query generation, join key resolution, and SQL dialect handling from
-        the first attempt on any question.
+        kb/architecture/ is intentionally NOT loaded here — those docs describe
+        how the agent itself is built and are team reference material, not
+        query-solving context.  The domain allowlist avoids pulling in
+        incidental files (CHANGELOG.MD, drafts) that a glob would sweep up.
         """
         docs: List[Document] = []
 
         # 1. agent/AGENT.md — loaded first as the master instruction file
         explicit_files = [_AGENT_MD]
 
-        # 2. All .md files from kb/domain/ (critical domain knowledge)
-        if _KB_DOMAIN.is_dir():
-            explicit_files.extend(sorted(_KB_DOMAIN.glob("*.md")))
+        # 2. kb/domain/ — explicit allowlist
+        explicit_files.extend(_KB_DOMAIN / name for name in _DOMAIN_ALWAYS_LOAD)
 
-        # 3. All .md files from kb/evaluation/
-        if _KB_EVALUATION.is_dir():
-            explicit_files.extend(sorted(_KB_EVALUATION.glob("*.md")))
-
-        # 4. Architecture behavioral docs (tool routing, execution loop)
-        explicit_files.extend(
-            _KB_ARCHITECTURE / name for name in _ARCHITECTURE_BEHAVIORAL
-        )
+        # # 3. All .md files from kb/evaluation/
+        # if _KB_EVALUATION.is_dir():
+        #     explicit_files.extend(sorted(_KB_EVALUATION.glob("*.md")))
 
         # Deduplicate (in case of overlaps) while preserving order
         seen_paths: set = set()
@@ -494,3 +580,35 @@ def _read_log_header() -> str:
     if cut == -1:
         cut = text.find("\n## 20")  # legacy format
     return text[:cut] if cut != -1 else text
+
+
+def _slice_doc_by_datasets(text: str, wanted: set, all_datasets: set) -> str:
+    """Slice a dataset-partitioned KB doc.  See `ContextManager.get_dataset_scoped_docs`.
+
+    - Text before the first `## ` heading is kept verbatim (preamble).
+    - Each `## ` section is classified by whether its heading contains any
+      name from `all_datasets` (case-insensitive, lowercased substring match).
+    - Dataset-specific sections are kept only if their matched dataset is in
+      `wanted`.  Global sections (no dataset in heading) are always kept.
+    - Fail-open: empty `wanted` or empty `all_datasets` → return `text` unchanged.
+    """
+    if not wanted or not all_datasets:
+        return text
+    headings = list(_H2_RE.finditer(text))
+    if not headings:
+        return text
+    wanted_lower = {w.lower() for w in wanted}
+    all_lower = {a.lower() for a in all_datasets}
+    # Preamble: everything before the first ## heading
+    out_parts = [text[: headings[0].start()]]
+    for i, m in enumerate(headings):
+        section_end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
+        section_text = text[m.start():section_end]
+        heading_lower = m.group(1).lower()
+        matched = next((ds for ds in all_lower if ds in heading_lower), None)
+        if matched is None:
+            out_parts.append(section_text)           # global — keep
+        elif matched in wanted_lower:
+            out_parts.append(section_text)           # wanted dataset — keep
+        # else: other dataset — drop
+    return "".join(out_parts)

@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "deps_dev_v1",
+  "query": "query1",
+  "root_name": "run_1",
+  "is_valid": false,
+  "reason": "Missing name: @dmrvos/infrajs>0.0.6>typescript",
+  "llm_answer": "Unable to determine answer",
+  "ground_truth": "\ufeffName,Version\n@dmrvos/infrajs>0.0.6>typescript,2.6.2\n@dmrvos/infrajs>0.0.5>typescript,2.6.2\n@dylanvann/svelte,3.25.4\n@dumc11/tailwindcss,0.4.0\n@dwarvesf/react-scripts>0.7.0>lodash.indexof,4.0.5",
+  "terminate_reason": "return_answer",
+  "duration": 83.43725800514221,
+  "iterations": 16
+}

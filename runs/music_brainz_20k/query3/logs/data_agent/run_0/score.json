@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "music_brainz_20k",
+  "query": "query3",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "No fuzzy match (Zo gaat het leven aan je voor) found in Unable to determine answer.. Best score: 0.40",
+  "llm_answer": "Unable to determine answer.",
+  "ground_truth": "Zo gaat het leven aan je voor (Hillich fjoer | Heilig vuur)\nZo gaat het leven aan je voor\nZo gaat het leven aan je voor - Hillich fjoer | Heilig vuur\n006-Zo gaat het leven aan je voor\nSyb van der Ploeg - Zo gaat het leven aan je voor",
+  "terminate_reason": "max_iterations",
+  "duration": 127.43337059020996,
+  "iterations": 30
+}

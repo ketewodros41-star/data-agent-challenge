@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "googlelocal",
+  "query": "query4",
+  "root_name": "run_1",
+  "is_valid": false,
+  "reason": "No number found after Encino Dermatology & Laser",
+  "llm_answer": "[{\"name\": \"Encino Dermatology & Laser: Alex Khadavi MD\", \"count\": 19}, {\"name\": \"The Boochyard @ Local Roots\", \"count\": 17}, {\"name\": \"Aurora Massage\", \"count\": 14}]",
+  "ground_truth": "Encino Dermatology & Laser: Alex Khadavi MD,19\nThe Boochyard @ Local Roots,17\nAurora Massage,14",
+  "terminate_reason": "return_answer",
+  "duration": 27.72581696510315,
+  "iterations": 7
+}

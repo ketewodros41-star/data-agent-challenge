@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "googlelocal",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "All names are present and in correct order.",
+  "llm_answer": "['Widows Peak Salon', 'City Textile', 'Nobel Textile Co', 'San Soo Dang', 'Nova Fabrics']",
+  "ground_truth": "Widows Peak Salon,4.857142857142857\nCity Textile,4.5\nNobel Textile Co,4.285714285714286\nSan Soo Dang,4.277777777777778\nNova Fabrics,3.3333333333333335",
+  "terminate_reason": "return_answer",
+  "duration": 12.69700837135315,
+  "iterations": 3
+}

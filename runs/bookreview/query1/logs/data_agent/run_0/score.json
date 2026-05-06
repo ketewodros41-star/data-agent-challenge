@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "bookreview",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "Ground truth found in LLM output.",
+  "llm_answer": "2020s",
+  "ground_truth": "2020",
+  "terminate_reason": "return_answer",
+  "duration": 15.0127854347229,
+  "iterations": 3
+}

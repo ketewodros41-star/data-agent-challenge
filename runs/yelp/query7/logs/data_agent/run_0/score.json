@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query7",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Missing category: breakfast & brunch",
+  "llm_answer": "['Food', 'Shopping', 'Restaurants', 'Grocery', 'American (New)']",
+  "ground_truth": "Restaurants\nFood\nAmerican (New)\nShopping\nBreakfast & Brunch",
+  "terminate_reason": "return_answer",
+  "duration": 53.37160778045654,
+  "iterations": 8
+}

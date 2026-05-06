@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "agnews",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Ground truth 'The Rundown' not found in LLM output: Unable to determine answer.",
+  "llm_answer": "Unable to determine answer.",
+  "ground_truth": "The Rundown",
+  "terminate_reason": "no_tool_call",
+  "duration": 86.56322121620178,
+  "iterations": 12
+}

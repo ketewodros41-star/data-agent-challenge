@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "music_brainz_20k",
+  "query": "query2",
+  "root_name": "run_1",
+  "is_valid": true,
+  "reason": "Ground truth found in LLM output.",
+  "llm_answer": "Amazon Music",
+  "ground_truth": "Amazon Music",
+  "terminate_reason": "return_answer",
+  "duration": 13.173980712890625,
+  "iterations": 3
+}

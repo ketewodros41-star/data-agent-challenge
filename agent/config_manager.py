@@ -111,11 +111,12 @@ class ConfigManager:
 
     def _toolbox_file_config(self, dataset_name: str, kind: str, extensions: List[str]) -> Optional[Tuple[str, str]]:
         sources = self._load_toolbox_sources()
+        marker = f"query_{dataset_name.lower()}"
         for source_name, cfg in sources.items():
             if cfg.get("kind") != kind:
                 continue
             container_path = cfg.get("database", "")
-            if f"query_{dataset_name.lower()}" not in container_path:
+            if marker not in container_path.lower():
                 continue
             prefix = kind.upper()
             host_path = os.getenv(f"{prefix}_{dataset_name.upper()}", "")
@@ -124,16 +125,25 @@ class ConfigManager:
             host_path = os.path.expanduser(host_path)
             mcp_tool = self._toolbox_mcp_tool_for_source(source_name)
             return host_path, mcp_tool
-            
-        # If not in tools.yaml, try scanning DAB root directly
+
+        # If not in tools.yaml, try scanning DAB root directly (case-insensitive)
         dab_root = os.getenv("DAB_ROOT", "/DataAgentBench")
-        dataset_dir = os.path.join(dab_root, f"query_{dataset_name.lower()}", "query_dataset")
-        if os.path.isdir(dataset_dir):
+        dataset_dir = ""
+        if os.path.isdir(dab_root):
+            import glob as _glob
+            for candidate in _glob.glob(os.path.join(dab_root, "query_*")):
+                if os.path.basename(candidate).lower() == f"query_{dataset_name.lower()}":
+                    dataset_dir = os.path.join(candidate, "query_dataset")
+                    break
+        if dataset_dir and os.path.isdir(dataset_dir):
             import glob
             for ext in extensions:
                 matches = sorted(glob.glob(os.path.join(dataset_dir, ext)))
                 if matches:
-                    return matches[0], ""
+                    mcp_tool = ""
+                    if kind == "duckdb":
+                        mcp_tool = f"duckdb_{dataset_name.lower()}_query"
+                    return matches[0], mcp_tool
         return None
 
     def parse_kb_dataset_registry(self) -> Dict[str, List[Dict[str, str]]]:
@@ -216,7 +226,9 @@ class ConfigManager:
                     configs[db_id] = cfg
 
             elif db_type in ("postgres", "postgresql"):
-                mcp_tool = os.getenv(f"{prefix}_MCP_TOOL", "") or self._toolbox_postgres_mcp_tool(dataset_name or db_id)
+                # Prioritize searching by the specific logical db_id (e.g. "review_database")
+                # over the generic dataset_name ("bookreview"). This fixes multi-DB routing.
+                mcp_tool = os.getenv(f"{prefix}_MCP_TOOL", "") or self._toolbox_postgres_mcp_tool(db_id or dataset_name)
                 cfg: dict = {"type": "postgres"}
                 if mcp_tool:
                     cfg["mcp_tool"] = mcp_tool
@@ -224,6 +236,22 @@ class ConfigManager:
 
             elif db_type == "mongodb":
                 conn = os.getenv(f"{prefix}_DB_CONN", "") or os.getenv("MONGODB_URL", "")
-                configs[db_id] = {"type": "mongodb", "connection_string": conn}
+                mcp_tool = os.getenv(f"{prefix}_MCP_TOOL", "") or self._toolbox_mongodb_mcp_tool(db_id)
+                cfg: dict = {"type": "mongodb", "connection_string": conn}
+                if mcp_tool:
+                    cfg["mcp_tool"] = mcp_tool
+                configs[db_id] = cfg
 
         return configs
+
+    def _toolbox_mongodb_mcp_tool(self, db_id: str) -> str:
+        """Find a `mongodb-aggregate` tool in tools.yaml whose `database` matches db_id."""
+        tools = self._load_toolbox_tools()
+        for tool_name, tool_cfg in tools.items():
+            if not isinstance(tool_cfg, dict):
+                continue
+            if tool_cfg.get("kind") != "mongodb-aggregate":
+                continue
+            if tool_cfg.get("database", "").lower() == db_id.lower():
+                return tool_name
+        return ""

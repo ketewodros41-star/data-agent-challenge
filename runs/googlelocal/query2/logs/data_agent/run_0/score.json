@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "googlelocal",
+  "query": "query2",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "No score found after name: Elite Massage",
+  "llm_answer": "[{'name': 'Angel-A Massage', 'avg_rating': 4.33333333333333}, {'name': 'Elite Massage', 'avg_rating': 5.0}, {'name': 'Aurora Massage', 'avg_rating': 4.17857142857143}]",
+  "ground_truth": "Elite Massage,5.0\nAngel-A Massage,4.333333333333333\nAurora Massage,4.178571428571429\nJ B Oriental Inc,4.166666666666667",
+  "terminate_reason": "return_answer",
+  "duration": 25.03558850288391,
+  "iterations": 8
+}

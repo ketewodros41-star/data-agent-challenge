@@ -49,13 +49,13 @@ def _tool_registry(root: Path) -> Dict[str, DuckDBTool]:
             description="Execute SQL against the GitHub Repos DuckDB-backed artifacts dataset.",
             database_path=root / "query_GITHUB_REPOS" / "query_dataset" / "repo_artifacts.db",
         ),
-        "duckdb_music_brainz_query": DuckDBTool(
-            name="duckdb_music_brainz_query",
+        "duckdb_music_brainz_20k_query": DuckDBTool(
+            name="duckdb_music_brainz_20k_query",
             description="Execute SQL against the Music Brainz sales DuckDB database.",
             database_path=root / "query_music_brainz_20k" / "query_dataset" / "sales.duckdb",
         ),
-        "duckdb_pancancer_query": DuckDBTool(
-            name="duckdb_pancancer_query",
+        "duckdb_pancancer_atlas_query": DuckDBTool(
+            name="duckdb_pancancer_atlas_query",
             description="Execute SQL against the PANCANCER molecular DuckDB-backed dataset.",
             database_path=root / "query_PANCANCER_ATLAS" / "query_dataset" / "pancancer_molecular.db",
         ),
@@ -73,6 +73,36 @@ def _tool_registry(root: Path) -> Dict[str, DuckDBTool]:
             name="duckdb_yelp_query",
             description="Execute SQL against the Yelp DuckDB-backed user dataset.",
             database_path=root / "query_yelp" / "query_dataset" / "yelp_user.db",
+        ),
+        "duckdb_user_database_query": DuckDBTool(
+            name="duckdb_user_database_query",
+            description="Execute SQL against the User Database DuckDB-backed dataset.",
+            database_path=root / "query_yelp" / "query_dataset" / "yelp_user.db",
+        ),
+        "duckdb_indextrade_database_query": DuckDBTool(
+            name="duckdb_indextrade_database_query",
+            description="Execute SQL against the Index Trade DuckDB-backed dataset.",
+            database_path=root / "query_stockindex" / "query_dataset" / "indextrade_query.db",
+        ),
+        "duckdb_business_database_query": DuckDBTool(
+            name="duckdb_business_database_query",
+            description="Execute SQL against the Business Database DuckDB-backed dataset.",
+            database_path=root / "query_googlelocal" / "query_dataset" / "review_query.db",
+        ),
+        "duckdb_clinical_database_query": DuckDBTool(
+            name="duckdb_clinical_database_query",
+            description="Execute SQL against the Clinical Database DuckDB-backed dataset.",
+            database_path=root / "query_PANCANCER_ATLAS" / "query_dataset" / "pancancer_molecular.db",
+        ),
+        "duckdb_googlelocal_query": DuckDBTool(
+            name="duckdb_googlelocal_query",
+            description="Execute SQL against the GoogleLocal DuckDB-backed dataset.",
+            database_path=root / "query_googlelocal" / "query_dataset" / "review_query.db",
+        ),
+        "duckdb_patents_query": DuckDBTool(
+            name="duckdb_patents_query",
+            description="Execute SQL against the Patents DuckDB-backed dataset.",
+            database_path=root / "query_PATENTS" / "query_dataset" / "patents_query.db",
         ),
     }
 

@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query4",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Value '3.63' not found in LLM output.",
+  "llm_answer": "Restaurants, 3.595959595959596",
+  "ground_truth": "Restaurant,3.633676092544987",
+  "terminate_reason": "return_answer",
+  "duration": 42.486377477645874,
+  "iterations": 7
+}

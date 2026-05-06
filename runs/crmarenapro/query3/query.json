@@ -1,0 +1,1 @@
+"Is the stage name accurately representing the tasks for this opportunity? If it is not, what should the appropriate stage name be? Return only the correct stage label among ('Qualification', 'Discovery', 'Quote', 'Negotiation', 'Closed').\n\n- Opportunity Id to be considered is: 006Wt000007BGGjIAO"

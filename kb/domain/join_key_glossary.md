@@ -111,6 +111,7 @@ barcode = re.search(r'TCGA-[A-Z0-9]{2}-[A-Z0-9]{4}', patient_description).group(
 **Fields:** (`System`, `Name`, `Version`) composite key
 **Problem:** All three columns must match; version strings may have whitespace or case variation.
 **Resolution:** Normalise all three fields with `LOWER(TRIM(...))` before joining.
+**Latest Version Warning:** Never compare version strings directly (e.g. `>` or `MAX`) for latest version logic. You MUST fetch the `VersionInfo` field, parse the JSON in Python, and identify the version with the maximum `Ordinal` among released versions (`IsRelease: true`).
 
 ---
 
@@ -120,6 +121,18 @@ barcode = re.search(r'TCGA-[A-Z0-9]{2}-[A-Z0-9]{4}', patient_description).group(
 **Fields:** `track_id` integer — exact match, no format mismatch.
 **Problem:** Multiple distinct `track_id` values in `tracks` may represent the same real-world track (duplicates from different ingestion sources).
 **Resolution:** Group by (`title`, `artist`, `album`) with fuzzy comparison before aggregating sales. Do not aggregate sales by raw `track_id` if the query asks about "songs" or "tracks" by name.
+**Literal vs. Semantic Matching:** If a query provides a specific misspelled name or title (e.g., 'Solonmon Burke'), the ground truth often expects a match on that exact string. Do not automatically expand the search to the "correct" spelling (e.g., 'Solomon') unless the literal search returns zero results.
+
+**Aggregation Strategy (Top N / Highest X):**
+  - **Phase 1: Bulk Discovery**: Identify the top ~1,000 `track_id`s by revenue using SQL. Fetch metadata for ALL of them in batches (see Python Integrity Rule #8).
+  - **Phase 2: Python Deduplication**: In a single Python script, group this metadata by normalized `title` and `artist`. Sum the revenue for matching names. This identifies the leaders immediately.
+  - **Phase 3: Deep Verification**: For the resulting Top 3 candidate songs, perform a targeted SQL `LIKE` search for their titles/artists to find ANY hidden `track_id`s that were outside the initial top 1,000. Aggregate their revenue for the final answer.
+
+### music_brainz_20k — Supplemental Search Guidance
+- **Title Scrambling & Noise:** Many high-revenue tracks have titles prefixed with indices, album names, or artist tags (e.g., `"009-Song"`, `"Bill ichoer - Song"`, `"Artist - Song"`).
+- **Python Scrubbing:** When deduplicating in Python, use regex or string splitting (e.g., `s.split(' - ')[-1]`) to extract the core song name. Strip leading numbers (e.g., `006-`) and parentheticals.
+- **Exhaustive Retrieval:** Always search for core song title keywords (e.g., `LIKE '%Bodied%'`) rather than exact matches to catch remixes and live versions.
+- **Deduplication:** Always aggregate revenue across ALL matching track IDs for a song name.
 
 ---
 

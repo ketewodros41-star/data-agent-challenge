@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query3",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Number 35 not found in LLM output.",
+  "llm_answer": "21",
+  "ground_truth": "35",
+  "terminate_reason": "return_answer",
+  "duration": 14.996586322784424,
+  "iterations": 3
+}

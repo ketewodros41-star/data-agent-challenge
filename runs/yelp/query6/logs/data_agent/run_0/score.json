@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query6",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "Name and all categories are present.",
+  "llm_answer": "['Coffee House Too Cafe', 'Restaurants, Breakfast & Brunch, American (New), Cafes']",
+  "ground_truth": "Coffee House Too Cafe, Restaurants, Breakfast & Brunch, American (New), Cafes",
+  "terminate_reason": "return_answer",
+  "duration": 16.70379328727722,
+  "iterations": 5
+}

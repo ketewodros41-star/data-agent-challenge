@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "googlelocal",
+  "query": "query4",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "All names and numbers matched.",
+  "llm_answer": "['Encino Dermatology & Laser: Alex Khadavi MD (19)', 'The Boochyard @ Local Roots (17)', 'Aurora Massage (14)']",
+  "ground_truth": "Encino Dermatology & Laser: Alex Khadavi MD,19\nThe Boochyard @ Local Roots,17\nAurora Massage,14",
+  "terminate_reason": "return_answer",
+  "duration": 16.245285987854004,
+  "iterations": 5
+}

@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockindex",
+  "query": "query2",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Found forbidden value: gsptse",
+  "llm_answer": "['GSPTSE', 'IXIC']",
+  "ground_truth": "IXIC",
+  "terminate_reason": "return_answer",
+  "duration": 23.895702362060547,
+  "iterations": 5
+}

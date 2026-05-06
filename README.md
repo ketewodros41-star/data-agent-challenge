@@ -1,355 +1,312 @@
-# Oracle Forge
+# Oracle Forge - Data Agent Benchmark
 
 Oracle Forge is Team PaLM's multi-database data analytics agent for the UC Berkeley DataAgentBench (DAB) benchmark. It answers natural-language questions across PostgreSQL, MongoDB, SQLite, and DuckDB, keeps traceable execution logs, and uses a sandbox for post-retrieval work such as extraction, merge, and validation.
-
-The system is built around three ideas from the design and sprint plan:
-
-- explicit context layers instead of prompt sprawl
-- MCP as the database access layer
-- self-correcting execution with measurable traces
 
 ## Team
 
 Team: `PaLM`
 
-| Member | Role Stream | Current Focus |
+| Member | Role | Responsibilities |
 | --- | --- | --- |
-| Bethel Yohannes | Drivers / Architecture & Infra | Agent integration, MCP setup, repo packaging |
-| Yosef Zewdu | Drivers / Architecture & Infra | Shared environment, dataset setup, architecture |
-| Estifanos Teklay | Intelligence Officers | Knowledge base and context layers |
-| Melkam Berhane | Intelligence Officers | Knowledge base and context layers |
-| Kidus Tewodros | Signal Corps | Progress reporting, external comms, benchmark narrative |
-| Mistire Daniel | Signal Corps | Progress reporting, external comms, benchmark narrative |
+| Bethel Yohannes | Lead Architect | Agent integration, MCP setup, repository structure |
+| Yosef Zewdu | Infrastructure Engineer | Database setup, environment configuration |
+| Estifanos Teklay | Intellgence Officer | Knowledge base and context layers |
+| Melkam Berhane | Intellegence officer| Domain knowledge and validation |
+| Kidus Tewodros | Signal corps | external world engagment |
+| Melkam Berhane | Signal corps | external world engagment |
 
-Source for team roster and role grouping: [planning/inception.md](planning/inception.md) and [signals/engagmentlog.md](signals/engagmentlog.md).
+## Architecture Overview
+
+```
+flowchart TD
+    %% =======================
+    %% Entry
+    %% =======================
+    U[User Query] --> CM
+
+    %% =======================
+    %% Layer 1: Context Injection
+    %% =======================
+    subgraph Layer1["Layer 1 — Context Injection"]
+        CM[Context Manager]
+        KB1[KB v1: Architecture]
+        KB2[KB v2: Domain + Schema + Join Glossary]
+        KB3[KB v3: Corrections + Patterns]
+        
+        KB1 --> CM
+        KB2 --> CM
+        KB3 --> CM
+    end
+
+    %% =======================
+    %% Layer 2: Conductor (Planning + Routing)
+    %% =======================
+    CM --> QR["Layer 2 — Conductor Agent\n(Planner + Router)"]
+
+    %% =======================
+    %% Layer 3: Execution (MCP + Databases)
+    %% =======================
+    QR --> MCP
+
+    subgraph Layer3["Layer 3 — Multi-DB Execution (MCP)"]
+        MCP[MCP Toolbox]
+        PG[(PostgreSQL)]
+        MG[(MongoDB)]
+        SL[(SQLite)]
+        DD[(DuckDB)]
+
+        MCP --> PG
+        MCP --> MG
+        MCP --> SL
+        MCP --> DD
+    end
+
+    %% =======================
+    %% Layer 4: Self-Correction Loop
+    %% =======================
+    MCP --> Repair
+
+    subgraph Layer4["Layer 4 — Self-Correction Loop"]
+        Repair[Coordinator]
+        FD[Failure Detector]
+        JR[Join Key Resolver]
+        TE[Sandbox Text Extractor]
+        RM[Result Merger + Validation]
+
+        Repair --> FD
+        Repair --> JR
+        Repair --> TE
+        Repair --> RM
+
+        FD --> Repair
+        JR --> Repair
+        TE --> Repair
+        RM --> Repair
+    end
+
+    %% =======================
+    %% Layer 5: Evaluation Harness
+    %% =======================
+    Repair --> Harness
+
+    subgraph Layer5["Layer 5 — Evaluation Harness"]
+        Harness[Harness Controller]
+        TL[Trace Logger]
+        SC[pass@1 Scorer]
+        RS[Regression Suite]
+
+        Harness --> TL
+        Harness --> SC
+        Harness --> RS
+    end
+
+    %% =======================
+    %% Output
+    %% =======================
+    Harness --> Output["Final Output\n{answer, query_trace, confidence}"]
+
+    %% =======================
+    %% Feedback Loop
+    %% =======================
+    Output -.->|Corrections / Learnings| KB3
+    KB3 -.-> CM["Context Manager(Claude 3-Layer Memory)"]
+
+    %% =======================
+    %% Styling
+    %% =======================
+    style Layer1 fill:#e3f2fd
+    style Layer4 fill:#fff3e0
+    style Layer5 fill:#e8f5e8
+```
+
+## Quick Start (5 Minutes)
+
+**For Complete Beginners - No Prior Knowledge Required**
+
+### Prerequisites
+- Python 3.10+ installed
+- Docker installed and running
+- Git installed
+
+### Step 1: Clone Repository
+```bash
+git clone <repository-url>
+cd data-agent-challenge
+```
+
+### Step 2: Install Dependencies
+```bash
+# Install uv (fast Python package installer)
+pip install uv
+
+# Install project dependencies
+uv sync
+```
+
+### Step 3: Start Required Services
+```bash
+# Start PostgreSQL container
+docker run -d --name team-dab-postgres -e POSTGRES_DB=bookreview_db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=teampalm -p 5432:5432 postgres:15
+
+# Start MongoDB container
+docker run -d --name team-dab-mongo -p 27017:27017 mongo:6.0
+
+# Start MCP Toolbox (PostgreSQL/MongoDB/SQLite)
+uv run python toolbox/mcp_server.py &
+
+# Start DuckDB MCP Server
+uv run python agent/duckdb_mcp_server.py &
+```
+
+### Step 4: Set Up Environment
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your API key
+# Add your LLM API key (OPENROUTER_API_KEY or ANTHROPIC_API_KEY)
+```
+
+### Step 5: Run Your First Query
+```bash
+# Test with BookReview dataset
+uv run python run_agent.py \
+  --dataset bookreview \
+  --query query_bookreview_benchmark/query1/query.json \
+  --iterations 10 \
+  --root_name run_0
+```
+
+### Step 6: Evaluate Results
+```bash
+# Score your agent's performance
+uv run python eval/run_evaluation.py \
+  --dataset bookreview \
+  --run run_0 \
+  --note "first_run"
+
+# View score progression
+uv run python eval/run_evaluation.py --progress
+```
+
+## Directory Structure
+
+```
+data-agent-challenge/
+|-- README.md                    # This file
+|-- .env.example                 # Environment variables template
+|-- run_agent.py                 # Main agent runner
+|-- agent/                       # Agent core logic
+|   |-- oracle_forge_agent.py   # Main agent class
+|   |-- agentic_loop.py          # LLM + tool execution loop
+|   |-- mcp_toolbox.py           # Database connector toolbox
+|   |-- llm_client.py            # LLM API client
+|   |-- loop_detector.py         # Loop detection for repetitive queries
+|   |-- planner_fallback.py      # Error recovery and safe execution
+|   |-- duckdb_mcp_server.py     # DuckDB MCP server
+|   `-- tests/                   # Agent unit tests
+|-- kb/                          # Knowledge base
+|   |-- domain/                  # Domain knowledge (datasets, schemas)
+|   |-- architecture/            # System architecture docs
+|   |-- evaluation/              # Evaluation methodology
+|   `-- agent/                   # Agent behavior guidelines
+|-- eval/                        # Evaluation harness
+|   |-- run_evaluation.py        # Scoring system
+|   |-- score_log.json           # Historical scores
+|   `-- trace_log.jsonl          # Detailed execution traces
+|-- utils/                       # Utility functions
+|   |-- dab_output.py            # DAB format output handling
+|   `-- ...
+|-- mcp/                         # MCP configuration
+|   |-- tools.yaml               # Database tool definitions
+|   |-- MANUAL.md                # MCP setup guide
+|   `-- servers/                 # MCP server implementations
+|-- query_bookreview_benchmark/  # BookReview test queries
+|-- query_yelp/                  # Yelp test queries
+|-- results/                     # Agent execution results
+|   |-- query_bookreview/        # BookReview run results
+|   `-- query_yelp/              # Yelp run results
+`-- toolbox/                     # MCP toolbox server
+```
+
+## Supported Databases
+
+| Database | Dataset | Tables/Collections | Access Method |
+|----------|----------|-------------------|---------------|
+| PostgreSQL | bookreview | books_info | MCP Tool: `run_query` |
+| MongoDB | yelp | business, checkin | MCP Tool: `find_yelp_businesses` |
+| SQLite | bookreview | review | MCP Tool: `sqlite_bookreview_query` |
+| DuckDB | yelp | review, tip, user | MCP Tool: `duckdb_yelp_query` |
+
+## Common Issues & Solutions
+
+### Issue: "Database connection refused"
+**Solution**: Check Docker containers are running
+```bash
+docker ps  # Should show postgres and mongo containers
+```
+
+### Issue: "LoopDetector initialization error"
+**Solution**: Clear Python cache
+```bash
+find . -name "__pycache__" -type d -exec rm -rf {} +
+```
+
+### Issue: "DuckDB server not starting"
+**Solution**: Check for module conflicts
+```bash
+# The agent/types.py conflicts with standard library
+# This is a known issue, use uv run to avoid it
+```
+
+## Evaluation Results
+
+Current performance across datasets:
+
+```bash
+# View latest scores
+uv run python eval/run_evaluation.py --progress
+
+# Expected output:
+# bookreview: 100.0% pass@1
+# yelp: 28.6% pass@1
+```
+
+## Contributing
+
+1. **Add new queries**: Place in appropriate `query_*/` directory
+2. **Improve knowledge**: Update `kb/domain/` files
+3. **Fix bugs**: Add tests in `agent/tests/`
+4. **Update docs**: Keep README files current
+
+## Live Agent
+
+The agent can be run interactively or through batch evaluation. See `run_agent.py --help` for all options.
+
+## Support
+
+For issues:
+1. Check this README first
+2. Look in `kb/evaluation/` for methodology
+3. Check `agent/tests/` for example usage
+4. Review `mcp/MANUAL.md` for database setup
 
 ## What We Built
 
 Oracle Forge is organized around four runtime layers:
 
 1. `OracleForgeAgent` handles the user question and assembles context.
-2. `QueryRouter` selects the right databases and decomposes multi-database work.
-3. `ExecutionEngine` dispatches database reads through MCP and post-processing through the sandbox.
-4. `Evaluation` traces tool calls and stores benchmark-style run artifacts.
+2. `AgenticLoop` executes the LLM + tool interaction.
+3. `MCPToolbox` provides database access across PostgreSQL, MongoDB, SQLite, and DuckDB.
+4. `Evaluation Harness` scores performance and tracks progress.
 
-The current system supports:
+## Live Agent Demo
 
-- PostgreSQL, MongoDB, and SQLite through Google MCP Toolbox
-- DuckDB through a separate custom MCP service
-- sandbox-backed `extract`, `merge`, `transform`, and `validate` operations
-- DAB-style query packaging under dataset folders such as `query_bookreview/query1/`
+The agent can be run interactively or through batch evaluation. See `run_agent.py --help` for all options.
 
-## Architecture Diagram
+## Technology Stack
 
-![alt text](<mermaid-diagram (1).svg>)
-
-## Repository Map
-
-- [agent/](agent) — agent runtime, router, execution engine, sandbox client, MCP clients
-- [mcp/](mcp) — shared toolbox config and team MCP manual
-- [workers/sandbox/](workers/sandbox) — Cloudflare Worker sandbox implementation
-- [kb/](kb) — architecture, domain, and memory knowledge base
-- [scripts/](scripts) — setup and runnable entrypoints
-- [design.md](design.md) — design document
-- [task.md](task.md) — implementation plan and task breakdown
-
-## Live Agent / Shared Server
-
- **For facilitators and team members only.** Access credentials available in `FACILITATOR_GUIDE.md`.
-
-The agent runs on a shared server. To query it:
-
-1. **Via SSH tunnel** (recommended for team access):
-   ```bash
-   ssh ubuntu@<SERVER_IP> -L 8080:localhost:8080
-   curl http://localhost:8080/health
-   ```
-
-2. **Direct access** (requires authorization):
-   Contact the team lead for the server address and API key.
-
-### Test the agent locally (after `./setup_dab.sh`)
-
-```bash
-# Health check
-curl http://127.0.0.1:8080/health
-
-# Ask a question
-curl -s http://127.0.0.1:8080/answer \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How many businesses are in the yelp dataset?", "dataset": "yelp"}' \
-  | python3 -m json.tool
-```
-
-Request body fields:
-
-| Field | Required | Description |
-|---|---|---|
-| `question` | yes | Natural language question |
-| `dataset` | no | DAB dataset name (default: `yelp`) |
-
-Available datasets: `yelp`, `bookreview`, `googlelocal`, `agnews`, `crmarenapro`, `stockindex`, `PANCANCER_ATLAS`, `DEPS_DEV_V1`, `GITHUB_REPOS`
-
-### Restart the agent server (after a reboot)
-
-From the repo root on the shared server:
-
-```bash
-./start_agent_server.sh          # start or restart
-./start_agent_server.sh status   # check running status
-./start_agent_server.sh stop     # stop both processes
-```
-
-This script starts the Python agent on port 8080 and an nginx Docker container
-that proxies port 80 → 8080.
-
-### SSH into the shared server
-
-```bash
-ssh ubuntu@<SERVER_IP>
-cd /home/yosef/data-agent-challenge
-```
-
-*Server address available in `FACILITATOR_GUIDE.md` (for team use only).*
-
-## Fresh Machine Setup
-
-These instructions assume a facilitator is starting from a fresh Linux machine with Git, Docker, Python 3.10+, and `uv` available.
-
-
-
-### 1. Clone the repos
-
-```bash
-cd ~
-git clone <your-org-or-fork>/data-agent-challenge.git
-git clone <your-org-or-fork>/DataAgentBench.git
-cd data-agent-challenge
-```
-
-### 2. Install Python dependencies
-
-```bash
-uv sync
-```
-
-### 3. Create `.env`
-
-Copy the example file:
-
-```bash
-cp .env.example .env
-```
-
-Set at least these values:
-
-```env
-TOOLBOX_URL=http://127.0.0.1:5000
-DAB_DATASET_ROOT=/home/<your-user>/DataAgentBench
-DUCKDB_MCP_URL=http://127.0.0.1:8001
-SANDBOX_URL=https://.....dev
-```
-
-Optional for live natural-language runs that call the external LLM backend:
-
-```env
-OPENROUTER_API_KEY=your-openrouter-key
-OPENROUTER_MODEL=google/gemini-3.1-pro-preview
-```
-
-The local test suite does not require `OPENROUTER_API_KEY`.
-
-If you are using the shared Dockerized Postgres and MongoDB containers, the defaults in [.env.example](.env.example) are already aligned with this repo:
-
-```env
-PG_HOST=127.0.0.1
-PG_PORT=55432
-PG_DATABASE=bookreview_db
-PG_USER=postgres
-PG_PASSWORD=teampalm
-MONGODB_URI=mongodb://127.0.0.1:57017
-MONGODB_DATABASE=yelp_db
-```
-
-### 4. Start MCP services
-
-From the repo root:
-
-```bash
-./setup_dab.sh
-```
-
-This starts:
-
-- Google Toolbox MCP in Docker at `http://127.0.0.1:5000`
-- DuckDB MCP at `http://127.0.0.1:8001`
-
-It also mounts your local `DataAgentBench` checkout into the toolbox container as `/datasets`, which is how the SQLite datasets are shared into MCP.
-
-If `./setup_dab.sh` fails immediately, first check whether these database containers already exist:
-
-```bash
-docker ps -a --format '{{.Names}}' | grep -E 'team-dab-postgres|team-dab-mongo'
-```
-
-If they do not exist on the machine, the facilitator needs either:
-
-- the team's shared database containers running locally with those names, or
-- an updated `mcp/tools.yaml` plus startup path that points to the actual shared database host
-
-### 5. Verify MCP is live
-
-List the registered tools:
-
-```bash
-curl -sS -X POST http://127.0.0.1:5000/mcp \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
-
-You should see tools such as:
-
-- `run_query`
-- `list_tables`
-- `sqlite_bookreview_query`
-- `find_yelp_businesses`
-- `find_yelp_checkins`
-
-### 6. Verify the sandbox
-
-```bash
-curl -sS "$SANDBOX_URL/health"
-```
-
-Optional extraction smoke test:
-
-```bash
-curl -sS "$SANDBOX_URL/execute" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "code_plan": "{\"operation\":\"keyword_sentiment\",\"input_ref\":\"review\",\"text_field\":\"text\",\"output_mode\":\"record\"}",
-    "trace_id": "manual-extract-check",
-    "db_type": "extract",
-    "inputs_payload": {
-      "review": { "text": "This book is amazing, loved every page" }
-    },
-    "step_id": "manual-extract"
-  }'
-```
-
-### 7. Run the agent
-
-Single question via the CLI:
-
-```bash
-echo '"How many businesses are in the yelp dataset?"' > /tmp/q.json
-uv run python run_agent.py \
-  --dataset yelp \
-  --query /tmp/q.json \
-  --iterations 1 \
-  --root_name smoke_test
-```
-
-Expected output ends with `Final answer :` and a `Confidence :` line.
-Results are written to `results/yelp/smoke_test_iter_1.json`.
-
-Or run via the HTTP API (once `start_agent_server.sh` is running):
-
-```bash
-curl -s http://127.0.0.1:8080/answer \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How many businesses are there?", "dataset": "yelp"}' \
-  | python3 -m json.tool
-```
-
-## How We Know We Are Using MCP
-
-We do not connect directly from the agent process to PostgreSQL or MongoDB in the main runtime path. The proof chain is:
-
-1. `tools/list` on the live MCP endpoint returns the tool registry.
-2. agent run artifacts record tool names such as `run_query` in `trace_events`.
-3. those same tools are directly invokable over the Toolbox HTTP API.
-
-Example:
-
-```bash
-curl -sS -X POST http://127.0.0.1:5000/api/tool/run_query/invoke \
-  -H 'Content-Type: application/json' \
-  -d '{"sql":"SELECT 1 AS ok"}'
-```
-
-That request goes to the MCP service, which then talks to the database.
-
-## Sandbox Contract
-
-The sandbox is the safe execution layer for operations that should happen outside the LLM but after retrieval. It currently handles structured:
-
-- `extract`
-- `merge`
-- `transform`
-- `validate`
-
-Request shape:
-
-```json
-{
-  "code_plan": "string",
-  "trace_id": "step-id:attempt-n",
-  "inputs_payload": {},
-  "db_type": "extract|transform|merge|validate",
-  "context": {
-    "shared_context": {},
-    "step_parameters": {},
-    "available_outputs": {}
-  },
-  "step_id": "string"
-}
-```
-
-Response shape:
-
-```json
-{
-  "result": {},
-  "trace": [],
-  "validation_status": "PASSED|FAILED|ERROR|RUNTIME_ERROR",
-  "error_if_any": null
-}
-```
-
-## Evidence and Evaluation
-
-This repo is designed to keep evaluation artifacts legible:
-
-- every agent run can export `query.json`, `run_result.json`, and `validate.py`
-- `trace_events` record tool usage and outcomes
-- benchmark-style datasets can be stored under folders like `query_bookreview/`
-
-Current BookReview workflow:
-
-```bash
-PYTHONPATH=. uv run python scripts/run_bookreview_query.py \
-  --bookreview-benchmark \
-  --eval-dir query_bookreview_benchmark \
-  --output /tmp/bookreview-benchmark-results.json
-```
-
-## Additional Docs
-
-- [design.md](design.md)
-- [task.md](task.md)
-- [mcp/MANUAL.md](mcp/MANUAL.md)
-- [workers/sandbox/README.md](workers/sandbox/README.md)
-- [planning/inception.md](planning/inception.md)
-
-## Current Status
-
-What is working now:
-
-- Query Routing and Self correction
-- MCP-backed Postgres, MongoDB, and SQLite access
-- DuckDB through a separate MCP service
-- sandbox-backed extraction and merge operations
-- DAB-style query export for BookReview
-- typed traces for runtime and benchmark artifacts
-- real shared-server access
+- **PostgreSQL, MongoDB, SQLite**: Google MCP Toolbox
+- **DuckDB**: Custom MCP service  
+- **Sandbox**: Python execution environment
+- **Evaluation**: DAB-style query packaging and scoring

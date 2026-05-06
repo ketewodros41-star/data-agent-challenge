@@ -51,13 +51,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Import KB parser and db-config builder from run_agent.py
-from run_agent import (
-    KB_DATASET_OVERVIEW,
-    build_db_configs_from_env,
-    parse_kb_dataset_registry,
-)
+from run_agent import KB_DATASET_OVERVIEW, MCP_TOOLS_YAML
+from agent.config_manager import ConfigManager
 from agent.oracle_forge_agent import OracleForgeAgent
+
+_config_mgr = ConfigManager(KB_DATASET_OVERVIEW, MCP_TOOLS_YAML)
 
 _PORT = int(os.getenv("AGENT_PORT", "8080"))
 
@@ -113,7 +111,7 @@ stockindex · PANCANCER_ATLAS · DEPS_DEV_V1 · GITHUB_REPOS</code></pre>
 
 def _load_registry() -> Dict[str, Any]:
     if KB_DATASET_OVERVIEW.exists():
-        return parse_kb_dataset_registry(KB_DATASET_OVERVIEW)
+        return _config_mgr.parse_kb_dataset_registry()
     return {}
 
 
@@ -124,7 +122,7 @@ def _run_query(question: str, dataset: str) -> Dict[str, Any]:
     if dataset_key in registry:
         databases_info = registry[dataset_key]
         db_ids = [d["db_id"] for d in databases_info]
-        db_configs = build_db_configs_from_env(databases_info, dataset_name=dataset_key)
+        db_configs = _config_mgr.build_db_configs_from_env(databases_info, dataset_name=dataset_key)
     else:
         db_ids = [dataset_key]
         db_configs = {}

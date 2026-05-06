@@ -1,0 +1,11 @@
+{
+  "dataset": "yelp",
+  "databases": [
+    "yelp_db",
+    "user_database"
+  ],
+  "question": "What is the average rating of all businesses located in Indianapolis, Indiana?",
+  "query_file": "query_yelp/query6/query.json",
+  "iterations": 5,
+  "results": []
+}

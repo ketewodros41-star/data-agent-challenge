@@ -1,0 +1,1 @@
+"Is the product setup in this quotation, including elements like quantity and price, against company regulations? Return only the Id of the knowledge article that the invalid config violates.\n\n## Invalid config guide.\nLook for the relevant knowledge articles to justify the invalid config.\n\n- Quote Id to be considered is: 0Q0Wt000001WRAzKAO"

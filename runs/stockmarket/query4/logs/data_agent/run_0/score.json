@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "stockmarket",
+  "query": "query4",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "validate.py raised ModuleNotFoundError: No module named 'common_scaffold'",
+  "llm_answer": "Unable to determine answer",
+  "ground_truth": "MFA Financial, Inc\nArgo Group International Holdings, Ltd\nHDFC Bank Limited Common Stock\nAlbany International Corporation Common Stock\nDTE Energy Company",
+  "terminate_reason": "return_answer",
+  "duration": 90.83083438873291,
+  "iterations": 20
+}

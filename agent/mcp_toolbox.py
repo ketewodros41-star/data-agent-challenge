@@ -1,9 +1,9 @@
 """
-MCP hybrid client.
+MCP client. All database calls go through HTTP to an MCP server:
+- PostgreSQL, MongoDB, SQLite -> Google MCP Toolbox binary (single instance)
+- DuckDB                      -> local DuckDB MCP service
 
-Routes database calls:
-- PostgreSQL, MongoDB, SQLite -> HTTP to Google MCP Toolbox binary
-- DuckDB -> HTTP to the local DuckDB MCP service
+No direct database drivers are used here.
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from pymongo import MongoClient
-
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - optional dependency
@@ -28,14 +26,21 @@ except ImportError:  # pragma: no cover - optional dependency
 
 load_dotenv()
 
-TOOLBOX_URL = os.getenv("MCP_TOOLBOX_URL", os.getenv("TOOLBOX_URL", "http://localhost:5000"))
+TOOLBOX_URL = os.getenv("MCP_TOOLBOX_URL", os.getenv("TOOLBOX_URL", "http://localhost:5001"))
 DUCKDB_MCP_URL = os.getenv("DUCKDB_MCP_URL", "http://127.0.0.1:8001")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://team-dab-mongo:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "yelp_db")
 
-HTTP_SOURCE_TYPES = {"postgres", "mongodb"}
+HTTP_SOURCE_TYPES = {"postgres", "mongodb", "sqlite"}
 DUCKDB_SOURCE_TYPES = {"duckdb"}
 SQLITE_SOURCE_TYPES = {"sqlite"}
+
+# Cap HTTP response size to prevent the agent from loading huge blobs (e.g.
+# SELECT * on a 3M-row table) into memory. The server still runs the query;
+# we just refuse to download past this limit and nudge the LLM to use LIMIT.
+MAX_HTTP_RESPONSE_BYTES = int(os.getenv("MCP_MAX_RESPONSE_BYTES", "2000000"))
+_OVERSIZE_HINT = (
+    "Response too large (>{limit} bytes). Re-issue the query with a tighter "
+    "WHERE, add LIMIT, or aggregate (COUNT/SUM/AVG/GROUP BY)."
+)
 
 
 @dataclass
@@ -75,8 +80,9 @@ class MCPToolbox:
             "list_tables": "postgres",
             "describe_books_info": "postgres",
             "preview_books_info": "postgres",
-            "find_yelp_businesses": "mongodb",
-            "find_yelp_checkins": "mongodb",
+            "mongodb_query": "mongodb",
+            "mongodb_query_yelp_business": "mongodb",
+            "mongodb_query_yelp_checkin": "mongodb",
             "sqlite_query": "sqlite",
             "sqlite_bookreview_query": "sqlite",
             "sqlite_googlelocal_query": "sqlite",
@@ -84,13 +90,20 @@ class MCPToolbox:
             "sqlite_crm_core_query": "sqlite",
             "sqlite_crm_products_query": "sqlite",
             "sqlite_crm_territory_query": "sqlite",
+            "sqlite_stockinfo_query": "sqlite",
+            "sqlite_music_brainz_tracks_query": "sqlite",
+            "sqlite_stockindex_info_query": "sqlite",
+            "sqlite_patents_publication_query": "sqlite",
+            "sqlite_deps_dev_package_query": "sqlite",
             "duckdb_query": "duckdb",
             "duckdb_crm_activities_query": "duckdb",
             "duckdb_crm_sales_pipeline_query": "duckdb",
             "duckdb_deps_dev_v1_query": "duckdb",
             "duckdb_github_repos_query": "duckdb",
             "duckdb_music_brainz_query": "duckdb",
+            "duckdb_music_brainz_20k_query": "duckdb",
             "duckdb_pancancer_query": "duckdb",
+            "duckdb_pancancer_atlas_query": "duckdb",
             "duckdb_stockindex_query": "duckdb",
             "duckdb_stockmarket_query": "duckdb",
             "duckdb_yelp_query": "duckdb",
@@ -98,15 +111,15 @@ class MCPToolbox:
 
     def call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
         """
-        Invoke a named tool. Routes to HTTP toolbox or direct DuckDB driver.
+        Invoke a named tool. DuckDB uses its own HTTP MCP service; every other
+        source (postgres, mongodb, sqlite) is dispatched to the Google MCP
+        Toolbox via HTTP.
         """
         parameters = self._normalize_parameters(tool_name, parameters)
         source_type = self._resolve_source_type(tool_name)
         start = time.time()
 
-        if source_type == "mongodb":
-            result = self._call_mongodb_direct(tool_name, parameters)
-        elif source_type in DUCKDB_SOURCE_TYPES:
+        if source_type in DUCKDB_SOURCE_TYPES:
             result = self._call_duckdb_http(tool_name, parameters)
         else:
             result = self._call_http(tool_name, parameters)
@@ -140,18 +153,29 @@ class MCPToolbox:
 
     def list_tools(self) -> List[Dict[str, Any]]:
         """
-        List all tools registered in the running toolbox binary.
+        List all tools registered in the running toolbox binary and duckdb mcp server.
         """
+        data = []
         try:
             payload = self._post_mcp("tools/list", {})
-            data = payload.get("result", {}).get("tools", [])
-            for tool in data:
-                name = tool.get("name", "")
-                if name:
-                    self._tool_source_map[name] = self._default_source_map.get(name, "")
-            return data
+            data.extend(payload.get("result", {}).get("tools", []))
         except Exception as exc:
-            return [{"error": str(exc)}]
+            pass
+
+        try:
+            duckdb_payload = self._post_mcp("tools/list", {}, base_url=self.duckdb_mcp_url)
+            data.extend(duckdb_payload.get("result", {}).get("tools", []))
+        except Exception as exc:
+            pass
+
+        if not data:
+            return [{"error": "Both toolboxes failed to respond."}]
+
+        for tool in data:
+            name = tool.get("name", "")
+            if name:
+                self._tool_source_map[name] = self._default_source_map.get(name, "")
+        return data
 
     def _call_http(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
         """Send tool invocation to MCP Toolbox HTTP server."""
@@ -167,7 +191,14 @@ class MCPToolbox:
 
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                raw = json.loads(resp.read().decode())
+                body = resp.read(MAX_HTTP_RESPONSE_BYTES + 1)
+                if len(body) > MAX_HTTP_RESPONSE_BYTES:
+                    return ToolResult(
+                        success=False,
+                        data=None,
+                        error=_OVERSIZE_HINT.format(limit=MAX_HTTP_RESPONSE_BYTES),
+                    )
+                raw = json.loads(body.decode())
 
                 result = raw.get("result", raw)
 
@@ -256,7 +287,14 @@ class MCPToolbox:
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode())
+                body = resp.read(MAX_HTTP_RESPONSE_BYTES + 1)
+                if len(body) > MAX_HTTP_RESPONSE_BYTES:
+                    return ToolResult(
+                        success=False,
+                        data=None,
+                        error=_OVERSIZE_HINT.format(limit=MAX_HTTP_RESPONSE_BYTES),
+                    )
+                data = json.loads(body.decode())
                 result = data.get("result", data)
                 normalized = self._normalize_mcp_content(result)
                 return ToolResult(success=True, data=normalized)
@@ -266,63 +304,6 @@ class MCPToolbox:
         except Exception as exc:
             return ToolResult(success=False, data=None, error=str(exc))
 
-    def _call_mongodb_direct(self, tool_name: str, parameters: Dict[str, Any]) -> ToolResult:
-        """
-        Execute MongoDB-backed Yelp tools directly.
-
-        The HTTP toolbox `mongodb-find` path currently ignores dynamic filters and
-        limits in this environment, so Mongo reads are handled here to preserve
-        the expected tool contract.
-        """
-        collection_name = "checkin" if tool_name == "find_yelp_checkins" else "business"
-
-        filter_payload = parameters.get("filterPayload", "{}")
-        if isinstance(filter_payload, str):
-            try:
-                query_filter = json.loads(filter_payload or "{}")
-            except json.JSONDecodeError as exc:
-                return ToolResult(success=False, data=None, error=f"Invalid Mongo filterPayload: {exc}")
-        elif isinstance(filter_payload, dict):
-            query_filter = filter_payload
-        else:
-            return ToolResult(success=False, data=None, error="Mongo filterPayload must be a JSON object or string")
-
-        limit = parameters.get("limit", 20)
-        try:
-            limit_value = max(1, int(limit))
-        except (TypeError, ValueError):
-            limit_value = 20
-
-        try:
-            with MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000) as client:
-                collection = client[MONGO_DB_NAME][collection_name]
-                if isinstance(query_filter, list):
-                    # Aggregation pipeline
-                    documents = list(collection.aggregate(query_filter))
-                else:
-                    # Simple find query
-                    documents = list(collection.find(query_filter).limit(limit_value))
-            return ToolResult(success=True, data=[self._sanitize_mongo_document(doc) for doc in documents])
-        except Exception as exc:
-            return ToolResult(success=False, data=None, error=f"MongoDB Error: {exc}")
-
-    @staticmethod
-    def _sanitize_mongo_document(value: Any) -> Any:
-        if isinstance(value, dict):
-            return {key: MCPToolbox._sanitize_mongo_document(val) for key, val in value.items()}
-        if isinstance(value, list):
-            return [MCPToolbox._sanitize_mongo_document(item) for item in value]
-        if isinstance(value, (str, int, float, bool)) or value is None:
-            return value
-        if hasattr(value, "isoformat"):
-            try:
-                return value.isoformat()
-            except Exception:
-                pass
-        if value.__class__.__name__ == "ObjectId":
-            return str(value)
-        return str(value)
-
     def _resolve_source_type(self, tool_name: str) -> str:
         """Determine source type for a tool name."""
         if tool_name in self._tool_source_map:
@@ -331,8 +312,9 @@ class MCPToolbox:
 
     @staticmethod
     def _normalize_parameters(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize legacy parameter names for toolbox tool kinds."""
+        """Translate agent-side parameter names to the names each tool expects."""
         normalized = dict(parameters)
+
         if tool_name in {"run_query", "postgres-sql", "postgres-execute-sql"}:
             if "sql" not in normalized and "query" in normalized:
                 normalized["sql"] = normalized.pop("query")
@@ -340,4 +322,15 @@ class MCPToolbox:
             normalized["sql"] = normalized.pop("query")
         if tool_name.startswith("duckdb") and "sql" not in normalized and "query" in normalized:
             normalized["sql"] = normalized.pop("query")
+
+        if tool_name.startswith("mongodb_query"):
+            if "pipeline" not in normalized and "query" in normalized:
+                normalized["pipeline"] = normalized.pop("query")
+            pipeline = normalized.get("pipeline")
+            if pipeline is not None and not isinstance(pipeline, str):
+                normalized["pipeline"] = json.dumps(pipeline)
+            # mongodb-aggregate accepts only `pipeline`; drop callers' extras.
+            for extra in ("database", "query_type", "sql"):
+                normalized.pop(extra, None)
+
         return normalized

@@ -2,38 +2,116 @@ sources:
   postgres_main:
     kind: postgres
     host: team-dab-postgres
-    port: 5432
+    port: 5435
     database: bookreview_db
+    user: postgres
+    password: teampalm
+
+  postgres_crm:
+    kind: postgres
+    host: 127.0.0.1
+    port: 55432
+    database: crm_support
+    user: postgres
+    password: teampalm
+
+  postgres_googlelocal:
+    kind: postgres
+    host: 127.0.0.1
+    port: 55432
+    database: googlelocal_db
+    user: postgres
+    password: teampalm
+
+  postgres_pancancer:
+    kind: postgres
+    host: 127.0.0.1
+    port: 55432
+    database: pancancer_clinical
+    user: postgres
+    password: teampalm
+
+  postgres_patents:
+    kind: postgres
+    host: 127.0.0.1
+    port: 55432
+    database: patent_CPCDefinition
     user: postgres
     password: teampalm
 
   mongo_main:
     kind: mongodb
-    uri: mongodb://team-dab-mongo:27017
+    uri: mongodb://127.0.0.1:57017
 
   sqlite_bookreview:
     kind: sqlite
-    database: /datasets/query_bookreview/query_dataset/review_query.db
+    database: /DataAgentBench/query_bookreview/query_dataset/review_query.db
 
   sqlite_googlelocal:
     kind: sqlite
-    database: /datasets/query_googlelocal/query_dataset/review_query.db
+    database: /DataAgentBench/query_googlelocal/query_dataset/review_query.db
 
   sqlite_agnews:
     kind: sqlite
-    database: /datasets/query_agnews/query_dataset/metadata.db
+    database: /DataAgentBench/query_agnews/query_dataset/metadata.db
 
   sqlite_crm_core:
     kind: sqlite
-    database: /datasets/query_crmarenapro/query_dataset/core_crm.db
+    database: /DataAgentBench/query_crmarenapro/query_dataset/core_crm.db
 
   sqlite_crm_products:
     kind: sqlite
-    database: /datasets/query_crmarenapro/query_dataset/products_orders.db
+    database: /DataAgentBench/query_crmarenapro/query_dataset/products_orders.db
 
   sqlite_crm_territory:
     kind: sqlite
-    database: /datasets/query_crmarenapro/query_dataset/territory.db
+    database: /DataAgentBench/query_crmarenapro/query_dataset/territory.db
+
+  sqlite_github_repos_metadata:
+    kind: sqlite
+    database: /DataAgentBench/query_GITHUB_REPOS/query_dataset/repo_metadata.db
+
+  sqlite_stockinfo:
+    kind: sqlite
+    database: /DataAgentBench/query_stockmarket/query_dataset/stockinfo_query.db
+
+  sqlite_music_brainz_tracks:
+    kind: sqlite
+    database: /DataAgentBench/query_music_brainz_20k/query_dataset/tracks.db
+
+  sqlite_stockindex_info:
+    kind: sqlite
+    database: /DataAgentBench/query_stockindex/query_dataset/indexInfo_query.db
+
+  sqlite_patents_publication:
+    kind: sqlite
+    database: /DataAgentBench/query_PATENTS/query_dataset/patent_publication.db
+
+  sqlite_deps_dev_package:
+    kind: sqlite
+    database: /DataAgentBench/query_DEPS_DEV_V1/query_dataset/package_query.db
+
+  # Additional SQLite sources for new databases
+  sqlite_patents:
+    kind: sqlite
+    database: /datasets/query_PATENTS/query_dataset/patents_query.db
+
+  # PostgreSQL sources for new databases
+  postgres_business:
+    kind: postgres
+    host: team-dab-postgres
+    port: 5435
+    database: business_database
+    user: postgres
+    password: teampalm
+
+  postgres_clinical:
+    kind: postgres
+    host: team-dab-postgres
+    port: 5435
+    database: clinical_database
+    user: postgres
+    password: teampalm
 
 tools:
   list_tables:
@@ -66,28 +144,78 @@ tools:
       FROM books_info
       LIMIT 10;
 
-  find_yelp_businesses:
-    kind: mongodb-find
-    source: mongo_main
-    database: yelp_db
-    collection: business
-    filterPayload: "{}"
-    limit: 5
-    description: Find documents in the Yelp business collection.
-
-  find_yelp_checkins:
-    kind: mongodb-find
-    source: mongo_main
-    database: yelp_db
-    collection: checkin
-    filterPayload: "{}"
-    limit: 5
-    description: Find documents in the Yelp checkin collection.
-
   run_query:
     kind: postgres-execute-sql
     source: postgres_main
-    description: Execute an arbitrary SQL query against the PostgreSQL database.
+    description: Execute an arbitrary SQL query against the BookReview PostgreSQL database.
+
+  run_crm_query:
+    kind: postgres-execute-sql
+    source: postgres_crm
+    description: Execute an arbitrary SQL query against the CRM Support PostgreSQL database.
+
+  run_googlelocal_query:
+    kind: postgres-execute-sql
+    source: postgres_googlelocal
+    description: Execute an arbitrary SQL query against the GoogleLocal PostgreSQL database.
+
+  run_pancancer_query:
+    kind: postgres-execute-sql
+    source: postgres_pancancer
+    description: Execute an arbitrary SQL query against the PanCancer Clinical PostgreSQL database.
+
+  run_patents_query:
+    kind: postgres-execute-sql
+    source: postgres_patents
+    description: Execute an arbitrary SQL query against the Patents CPC PostgreSQL database.
+
+  mongodb_query:
+    kind: mongodb-aggregate
+    source: mongo_main
+    database: articles_db
+    collection: articles
+    readOnly: true
+    description: |
+      Execute a MongoDB aggregation pipeline against articles_db.articles.
+      The `pipeline` parameter must be a JSON array of aggregation stages.
+    pipelinePayload: |
+      {{.pipeline}}
+    pipelineParams:
+      - name: pipeline
+        type: string
+        description: MongoDB aggregation pipeline as a JSON array string.
+
+  mongodb_query_yelp_business:
+    kind: mongodb-aggregate
+    source: mongo_main
+    database: yelp_db
+    collection: business
+    readOnly: true
+    description: |
+      Execute a MongoDB aggregation pipeline against yelp_db.business.
+      The `pipeline` parameter must be a JSON array of aggregation stages.
+    pipelinePayload: |
+      {{.pipeline}}
+    pipelineParams:
+      - name: pipeline
+        type: string
+        description: MongoDB aggregation pipeline as a JSON array string.
+
+  mongodb_query_yelp_checkin:
+    kind: mongodb-aggregate
+    source: mongo_main
+    database: yelp_db
+    collection: checkin
+    readOnly: true
+    description: |
+      Execute a MongoDB aggregation pipeline against yelp_db.checkin.
+      The `pipeline` parameter must be a JSON array of aggregation stages.
+    pipelinePayload: |
+      {{.pipeline}}
+    pipelineParams:
+      - name: pipeline
+        type: string
+        description: MongoDB aggregation pipeline as a JSON array string.
 
   sqlite_bookreview_query:
     kind: sqlite-execute-sql
@@ -119,18 +247,42 @@ tools:
     source: sqlite_crm_territory
     description: Execute SQL against the CRM Arena Pro territory SQLite database.
 
+  # Tools for new databases
+  sqlite_patents_query:
+    kind: sqlite-execute-sql
+    source: sqlite_patents
+    description: Execute SQL against the Patents SQLite database.
+
+  run_business_query:
+    kind: postgres-execute-sql
+    source: postgres_business
+    description: Execute an arbitrary SQL query against the Business Database.
+
+  run_clinical_query:
+    kind: postgres-execute-sql
+    source: postgres_clinical
+    description: Execute an arbitrary SQL query against the Clinical Database.
+
 toolsets:
   oracle_forge:
     tools:
       - list_tables
       - describe_books_info
       - preview_books_info
-      - find_yelp_businesses
-      - find_yelp_checkins
       - run_query
+      - run_crm_query
+      - run_googlelocal_query
+      - run_pancancer_query
+      - run_patents_query
+      - mongodb_query
+      - mongodb_query_yelp_business
+      - mongodb_query_yelp_checkin
       - sqlite_bookreview_query
       - sqlite_googlelocal_query
       - sqlite_agnews_query
       - sqlite_crm_core_query
       - sqlite_crm_products_query
       - sqlite_crm_territory_query
+      - sqlite_patents_query
+      - run_business_query
+      - run_clinical_query

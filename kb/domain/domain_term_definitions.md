@@ -180,6 +180,7 @@ The agent must know these definitions before answering — they cannot be inferr
 | "has security advisory" | `Advisories` list is non-empty after parsing |
 | "publication date" | `UpstreamPublishedAt` ÷ 1000 → Unix seconds → `datetime.fromtimestamp()` |
 | "MIT-licensed" | `Licenses` array contains `"MIT"` after parsing |
+| "latest release version" | Version with the highest `VersionInfo.Ordinal` value among those where `VersionInfo.IsRelease = True`. Do NOT use SQL `MAX(version)` as string sorting is unreliable for SemVer. |
 
 ---
 

@@ -1,0 +1,254 @@
+[
+  {
+    "dataset": "agnews",
+    "query": "1",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "agnews",
+    "query": "2",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "agnews",
+    "query": "4",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "bookreview",
+    "query": "1",
+    "run": "0",
+    "answer": "2020s"
+  },
+  {
+    "dataset": "bookreview",
+    "query": "2",
+    "run": "0",
+    "answer": "['Reunion: The Children of Lauderdale Park', 'The Prophet: With Original 1923 Illustrations by the Author', 'The Melancholy Strumpet Master', 'Child Of The King A Journey of Hope Book 1: Earthly Story With A Heavenly Message', 'Fire Cracker', 'Local Honey', 'Hollywood Confessions: Hollywood Headlines Book #3 (Hollywood Headlines Mysteries)', 'Knowing When To Die: Uncollected Stories', 'Childe Harold of Dysna', 'Forged in Blood (Freehold)', 'Exits, Desires, & Slow Fires', 'Kennebago Moments', 'The Sludge', 'Liza of Lambeth', 'Something That Feels Like Truth (Switchgrass Books)']"
+  },
+  {
+    "dataset": "bookreview",
+    "query": "3",
+    "run": "0",
+    "answer": "['Around the World Mazes', 'Behind the Wheel (Choose Your Own Adventure #35)(Paperback/Revised)', \"Benny Goes To The Moon: The great new book from Top Children's entertainer Gerry Ogilvie (1)\", 'Cheer Up, Ben Franklin! (Young Historians)', 'Clark the Shark: Tooth Trouble, No. 1', 'Cleo Porter and the Body Electric', 'Egypt (Enchantment of the World)', 'Favorite Thorton W. Burgess Stories: 6 Books', 'LunaLu the Llamacorn', 'Monstrous Stories #4: The Day the Mice Stood Still', 'Pok\u00e9mon: Sun & Moon, Vol. 8 (8)', 'The Library Book', 'The Old Man and the Pirate Princess', 'Trouble in the CTC!: The Terra Prime Adventures Book 2']"
+  },
+  {
+    "dataset": "crmarenapro",
+    "query": "1",
+    "run": "0",
+    "answer": "['Budget', 'Authority', 'Need', 'Timeline']"
+  },
+  {
+    "dataset": "crmarenapro",
+    "query": "2",
+    "run": "0",
+    "answer": "None"
+  },
+  {
+    "dataset": "deps_dev_v1",
+    "query": "1",
+    "run": "0",
+    "answer": "Unable to determine answer"
+  },
+  {
+    "dataset": "googlelocal",
+    "query": "1",
+    "run": "0",
+    "answer": "['Widows Peak Salon', 'City Textile', 'Nobel Textile Co', 'San Soo Dang', 'Nova Fabrics']"
+  },
+  {
+    "dataset": "googlelocal",
+    "query": "2",
+    "run": "0",
+    "answer": "[{'name': 'Angel-A Massage', 'avg_rating': 4.33333333333333}, {'name': 'Elite Massage', 'avg_rating': 5.0}, {'name': 'Aurora Massage', 'avg_rating': 4.17857142857143}]"
+  },
+  {
+    "dataset": "googlelocal",
+    "query": "3",
+    "run": "0",
+    "answer": "[{\"name\": \"Taba Rug Gallery\", \"hours\": [\"Thursday\", \"10AM\u20137PM\", \"Friday\", \"10AM\u20137PM\", \"Saturday\", \"10AM\u20137PM\", \"Sunday\", \"11AM\u20136PM\", \"Monday\", \"10AM\u20137PM\", \"Tuesday\", \"10AM\u20137PM\", \"Wednesday\", \"10AM\u20137PM\"], \"average_rating\": 5.0}, {\"name\": \"Beauty Divine Artistry\", \"hours\": [\"Thursday\", \"9AM\u20138PM\", \"Friday\", \"9AM\u20138PM\", \"Saturday\", \"10AM\u20137PM\", \"Sunday\", \"11AM\u20136PM\", \"Monday\", \"9AM\u20138PM\", \"Tuesday\", \"9AM\u20138PM\", \"Wednesday\", \"9AM\u20138PM\"], \"average_rating\": 5.0}, {\"name\": \"White Barn Candle Co\", \"hours\": [\"Thursday\", \"10AM\u20139PM\", \"Friday\", \"10AM\u20139PM\", \"Saturday\", \"10AM\u20139PM\", \"Sunday\", \"11AM\u20137PM\", \"Monday\", \"10AM\u20139PM\", \"Tuesday\", \"10AM\u20139PM\", \"Wednesday\", \"10AM\u20139PM\"], \"average_rating\": 5.0}, {\"name\": \"TACOS LA CABANA\", \"hours\": [\"Thursday\", \"Closed\", \"Friday\", \"5\u201311PM\", \"Saturday\", \"5\u201311PM\", \"Sunday\", \"5\u201311PM\", \"Monday\", \"5\u201311PM\", \"Tuesday\", \"Closed\", \"Wednesday\", \"Closed\"], \"average_rating\": 5.0}, {\"name\": \"Mariscos el poblano\", \"hours\": [\"Thursday\", \"Open 24 hours\", \"Friday\", \"8AM\u20133:30PM\", \"Saturday\", \"8AM\u20133:30PM\", \"Sunday\", \"8AM\u20133:30PM\", \"Monday\", \"9AM\u20133:30AM\", \"Tuesday\", \"8AM\u20133:30PM\", \"Wednesday\", \"8AM\u20133:30PM\"], \"average_rating\": 5.0}]"
+  },
+  {
+    "dataset": "googlelocal",
+    "query": "4",
+    "run": "0",
+    "answer": "['Encino Dermatology & Laser: Alex Khadavi MD (19)', 'The Boochyard @ Local Roots (17)', 'Aurora Massage (14)']"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "1",
+    "run": "0",
+    "answer": "601.44"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "2",
+    "run": "0",
+    "answer": "iTunes"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "3",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "patents",
+    "query": "1",
+    "run": "0",
+    "answer": "Unable to determine answer"
+  },
+  {
+    "dataset": "stockindex",
+    "query": "1",
+    "run": "0",
+    "answer": "399001.SZ"
+  },
+  {
+    "dataset": "stockindex",
+    "query": "2",
+    "run": "0",
+    "answer": "['GSPTSE', 'IXIC']"
+  },
+  {
+    "dataset": "stockindex",
+    "query": "3",
+    "run": "0",
+    "answer": "[{\"Index\": \"IXIC\", \"Country\": \"USA\"}, {\"Index\": \"NSEI\", \"Country\": \"India\"}, {\"Index\": \"399001.SZ\", \"Country\": \"China\"}, {\"Index\": \"GDAXI\", \"Country\": \"Germany\"}, {\"Index\": \"TWII\", \"Country\": \"Taiwan\"}]"
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "1",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "2",
+    "run": "0",
+    "answer": "Unable to determine answer"
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "3",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "4",
+    "run": "0",
+    "answer": "Unable to determine answer"
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "5",
+    "run": "0",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "yelp",
+    "query": "1",
+    "run": "0",
+    "answer": "3.547008547008547"
+  },
+  {
+    "dataset": "yelp",
+    "query": "2",
+    "run": "0",
+    "answer": "[\"PA\", 3.699395770392749]"
+  },
+  {
+    "dataset": "yelp",
+    "query": "3",
+    "run": "0",
+    "answer": "21"
+  },
+  {
+    "dataset": "yelp",
+    "query": "4",
+    "run": "0",
+    "answer": "Restaurants, 3.595959595959596"
+  },
+  {
+    "dataset": "yelp",
+    "query": "5",
+    "run": "0",
+    "answer": "['PA', 3.582654975033492]"
+  },
+  {
+    "dataset": "yelp",
+    "query": "6",
+    "run": "0",
+    "answer": "['Coffee House Too Cafe', 'Restaurants, Breakfast & Brunch, American (New), Cafes']"
+  },
+  {
+    "dataset": "yelp",
+    "query": "7",
+    "run": "0",
+    "answer": "['Food', 'Shopping', 'Restaurants', 'Grocery', 'American (New)']"
+  },
+  {
+    "dataset": "agnews",
+    "query": "1",
+    "run": "1",
+    "answer": "The Rundown"
+  },
+  {
+    "dataset": "deps_dev_v1",
+    "query": "1",
+    "run": "1",
+    "answer": "Unable to determine answer"
+  },
+  {
+    "dataset": "googlelocal",
+    "query": "4",
+    "run": "1",
+    "answer": "[{\"name\": \"Encino Dermatology & Laser: Alex Khadavi MD\", \"count\": 19}, {\"name\": \"The Boochyard @ Local Roots\", \"count\": 17}, {\"name\": \"Aurora Massage\", \"count\": 14}]"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "1",
+    "run": "1",
+    "answer": "1059.46"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "2",
+    "run": "1",
+    "answer": "Amazon Music"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "3",
+    "run": "1",
+    "answer": "Systemisch bled"
+  },
+  {
+    "dataset": "stockmarket",
+    "query": "5",
+    "run": "1",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "2",
+    "run": "2",
+    "answer": "Amazon Music"
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "3",
+    "run": "2",
+    "answer": "Unable to determine answer."
+  },
+  {
+    "dataset": "music_brainz_20k",
+    "query": "3",
+    "run": "3",
+    "answer": "Unable to determine answer."
+  }
+]

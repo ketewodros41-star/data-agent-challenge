@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query1",
+  "root_name": "run_0",
+  "is_valid": true,
+  "reason": "Found matching number: 3.547008547008547 \u2248 3.55",
+  "llm_answer": "3.547008547008547",
+  "ground_truth": "3.547008547008547",
+  "terminate_reason": "return_answer",
+  "duration": 28.414381980895996,
+  "iterations": 6
+}

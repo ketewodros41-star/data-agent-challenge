@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "yelp",
+  "query": "query5",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "Number near 'PA' does not match \u22483.48",
+  "llm_answer": "['PA', 3.582654975033492]",
+  "ground_truth": "PA,3.48",
+  "terminate_reason": "return_answer",
+  "duration": 34.58430027961731,
+  "iterations": 8
+}

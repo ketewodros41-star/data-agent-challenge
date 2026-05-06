@@ -1,0 +1,13 @@
+{
+  "timestamp": "20260420_061304",
+  "dataset": "crmarenapro",
+  "query": "query2",
+  "root_name": "run_0",
+  "is_valid": false,
+  "reason": "LLM output indicates no policy violation, but expected knowledge article ID",
+  "llm_answer": "None",
+  "ground_truth": "ka0Wt000000Eq0MIAS",
+  "terminate_reason": "return_answer",
+  "duration": 175.33884024620056,
+  "iterations": 37
+}
